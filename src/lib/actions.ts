@@ -40,7 +40,7 @@ export async function setJobStatus(id: number, status: JobStatus): Promise<Resul
  * so the next scraper run re-scores the best candidates against the new answers.
  */
 export async function saveAnswers(raw: unknown): Promise<Result<{ rescored: number }>> {
-  return guarded(async () => {
+  return guarded<{ rescored: number }>(async () => {
     const answers = normalizeAnswers(raw);
     const db = getDb();
     const version = await saveProfile(db, { answers });
@@ -72,7 +72,7 @@ async function rescoreRecent(answers: ProfileAnswers, version: number) {
 const MAX_CV_BYTES = 4 * 1024 * 1024;
 
 export async function uploadCv(form: FormData): Promise<Result<{ chars: number }>> {
-  return guarded(async () => {
+  return guarded<{ chars: number }>(async () => {
     const file = form.get("cv");
     if (!(file instanceof File) || !file.size) return { ok: false, error: "לא נבחר קובץ" };
     if (file.size > MAX_CV_BYTES) return { ok: false, error: "הקובץ גדול מ-4MB" };
@@ -100,7 +100,7 @@ export async function draftFromCv(): Promise<Result<{ draft: Partial<ProfileAnsw
 
 /** Adds a company board from a careers-page URL (Comeet, Greenhouse, Lever, Ashby), after checking it answers. */
 export async function addCompany(input: string, name: string): Promise<Result<{ name: string; jobs: number }>> {
-  return guarded(async () => {
+  return guarded<{ name: string; jobs: number }>(async () => {
     const board = boardOf(input.trim());
     if (!board) return { ok: false, error: "קישור לא מזוהה. צריך קישור ללוח משרות ב-Comeet / Greenhouse / Lever / Ashby" };
     const count = await probeBoard(board.ats, board.slug);
