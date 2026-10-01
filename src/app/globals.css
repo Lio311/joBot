@@ -1,0 +1,144 @@
+@import "tailwindcss";
+
+:root {
+  --bg: #f7f6f3;
+  --surface: #ffffff;
+  --surface-2: #f1efeb;
+  --border: #e7e4de;
+  --border-strong: #d6d2ca;
+  --fg: #1c1b19;
+  --muted: #6f6b64;
+  --faint: #a19c93;
+  --accent: #0f766e;
+  --accent-soft: #e3f1ee;
+  --accent-fg: #ffffff;
+
+  --p1: #0b6b3a;
+  --p1-soft: #e3f3ea;
+  --p2: #1f4fb4;
+  --p2-soft: #e7eefc;
+  --p3: #6a45b8;
+  --p3-soft: #efe9fb;
+  --p4: #6b665e;
+  --p4-soft: #efede9;
+
+  --drop: #0b6b3a;
+  --drop-soft: #e3f3ea;
+  --rise: #b45309;
+  --rise-soft: #fcefdf;
+  --danger: #c4261d;
+  /* Favorites: gold fill, darker edge so the star holds up on white. */
+  --star: #f5ad0a;
+  --star-edge: #c48600;
+  --shadow-card: 0 1px 2px rgb(28 27 25 / 0.04), 0 1px 1px rgb(28 27 25 / 0.03);
+  --shadow-lift: 0 12px 32px -12px rgb(28 27 25 / 0.18), 0 2px 6px rgb(28 27 25 / 0.05);
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0f0f0e;
+    --surface: #171716;
+    --surface-2: #1e1e1c;
+    --border: #2a2927;
+    --border-strong: #3a3936;
+    --fg: #edebe7;
+    --muted: #9d998f;
+    --faint: #6d6a63;
+    --accent: #2cc2ad;
+    --accent-soft: #0f2d29;
+    --accent-fg: #07201d;
+
+    --p1: #5fd49a;
+    --p1-soft: #11271b;
+    --p2: #86a8f5;
+    --p2-soft: #151e33;
+    --p3: #b79af0;
+    --p3-soft: #211a33;
+    --p4: #aaa59c;
+    --p4-soft: #22211f;
+
+    --drop: #5fd49a;
+    --drop-soft: #11271b;
+    --rise: #f2a65a;
+    --rise-soft: #2d1d0d;
+    --danger: #f87171;
+    --star: #fbbf24;
+    --star-edge: #fbbf24;
+    --shadow-card: 0 0 0 1px rgb(255 255 255 / 0.02);
+    --shadow-lift: 0 16px 40px -16px rgb(0 0 0 / 0.7);
+    color-scheme: dark;
+  }
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-fg: var(--fg);
+  --color-muted: var(--muted);
+  --color-faint: var(--faint);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-fg: var(--accent-fg);
+  --color-danger: var(--danger);
+  --color-star: var(--star);
+  --color-star-edge: var(--star-edge);
+  --font-sans: var(--font-geist-sans), var(--font-heebo), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+  --ease-out-quint: cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+html {
+  background: var(--bg);
+}
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: var(--accent-soft);
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Scanning LED on the logo's right eye. */
+@keyframes blink {
+  0%, 92%, 100% { opacity: 1; }
+  95% { opacity: 0.25; }
+}
+.logo-eye {
+  animation: blink 5s infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .logo-eye { animation: none; }
+  *, *::before, *::after { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
+}
+
+/* Faint architectural grid used behind cards without a photo. */
+.blueprint {
+  background-color: var(--surface-2);
+  background-image:
+    linear-gradient(var(--border) 1px, transparent 1px),
+    linear-gradient(90deg, var(--border) 1px, transparent 1px);
+  background-size: 18px 18px;
+  background-position: -1px -1px;
+}
+
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield;
+}

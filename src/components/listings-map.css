@@ -1,0 +1,546 @@
+/* ListingsMap — MapLibre chrome restyled with the app's design tokens. */
+
+.lm-root {
+  --lm-ease: cubic-bezier(0.23, 1, 0.32, 1);
+  --lm-pill-bg: var(--surface);
+  --lm-pill-border: rgb(28 27 25 / 0.1);
+  --lm-pill-shadow: 0 1px 1px rgb(28 27 25 / 0.06), 0 2px 6px -1px rgb(28 27 25 / 0.18);
+  --lm-glass: color-mix(in srgb, var(--surface) 86%, transparent);
+
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  /* Keep marker / popup z-indexes from leaking into the page. */
+  isolation: isolate;
+  background: var(--surface-2);
+  font-family: var(--font-sans);
+}
+
+@media (prefers-color-scheme: dark) {
+  .lm-root {
+    --lm-pill-bg: var(--surface-2);
+    --lm-pill-border: rgb(255 255 255 / 0.1);
+    --lm-pill-shadow: 0 1px 2px rgb(0 0 0 / 0.5), 0 4px 10px -2px rgb(0 0 0 / 0.55);
+    --lm-glass: color-mix(in srgb, var(--surface) 82%, transparent);
+  }
+}
+
+.lm-canvas {
+  position: absolute;
+  inset: 0;
+  isolation: isolate;
+}
+
+.lm-root .lm-canvas.maplibregl-map {
+  font-family: var(--font-sans);
+}
+
+/* ------------------------------------------------------------------ */
+/* Price pills                                                         */
+/* ------------------------------------------------------------------ */
+
+/* Outer element: MapLibre owns its transform. Only stacking lives here. */
+.lm-marker {
+  z-index: 1;
+  cursor: pointer;
+  line-height: 0;
+}
+.lm-marker[data-p="1"] { z-index: 2; }
+.lm-marker:hover { z-index: 3; }
+.lm-marker.is-active { z-index: 4; }
+.lm-marker.is-selected { z-index: 5; }
+
+.lm-pill {
+  --lm-dot: var(--p4);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  height: 24px;
+  padding: 0 8px 0 7px;
+  margin: 0;
+  border: 1px solid var(--lm-pill-border);
+  border-radius: 999px;
+  background: var(--lm-pill-bg);
+  color: var(--fg);
+  box-shadow: var(--lm-pill-shadow);
+  font: 600 11.5px/1 var(--font-sans);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  transform-origin: 50% 50%;
+  transition:
+    transform 180ms var(--lm-ease),
+    background-color 180ms var(--lm-ease),
+    border-color 180ms var(--lm-ease),
+    color 180ms var(--lm-ease),
+    box-shadow 180ms var(--lm-ease);
+}
+
+.lm-pill-dot {
+  width: 6px;
+  height: 6px;
+  flex: none;
+  border-radius: 999px;
+  background: var(--lm-dot);
+  transition: box-shadow 180ms var(--lm-ease);
+}
+
+.lm-pill-price {
+  transform: translateY(0.25px);
+}
+
+@media (hover: hover) {
+  .lm-pill:hover {
+    border-color: var(--border-strong);
+  }
+}
+
+.lm-pill:active {
+  transform: scale(0.96);
+}
+
+.lm-pill:focus {
+  outline: none;
+}
+.lm-pill:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.lm-pill.is-active {
+  background: var(--fg);
+  border-color: var(--fg);
+  color: var(--bg);
+  transform: scale(1.08);
+  box-shadow: 0 2px 4px rgb(0 0 0 / 0.14), 0 8px 18px -6px rgb(0 0 0 / 0.4);
+}
+.lm-pill.is-active .lm-pill-dot {
+  /* Keeps dark priority colors readable on the inverted pill. */
+  box-shadow: 0 0 0 1.5px var(--bg);
+}
+.lm-pill.is-active:active {
+  transform: scale(1.02);
+}
+
+/* ------------------------------------------------------------------ */
+/* Popup                                                               */
+/* ------------------------------------------------------------------ */
+
+.lm-popup {
+  z-index: 10;
+}
+
+.lm-popup .maplibregl-popup-tip {
+  display: none;
+}
+
+.lm-popup.maplibregl-popup .maplibregl-popup-content {
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+  color: var(--fg);
+  box-shadow: var(--shadow-lift), 0 1px 3px rgb(28 27 25 / 0.08);
+  font-family: var(--font-sans);
+  transform-origin: 50% 100%;
+  animation: lm-popup-in 200ms var(--lm-ease) both;
+}
+
+/* Grow out of the marker, whichever side MapLibre anchors to. */
+.lm-popup.maplibregl-popup-anchor-top .maplibregl-popup-content { transform-origin: 50% 0; }
+.lm-popup.maplibregl-popup-anchor-top-left .maplibregl-popup-content { transform-origin: 0 0; }
+.lm-popup.maplibregl-popup-anchor-top-right .maplibregl-popup-content { transform-origin: 100% 0; }
+.lm-popup.maplibregl-popup-anchor-bottom-left .maplibregl-popup-content { transform-origin: 0 100%; }
+.lm-popup.maplibregl-popup-anchor-bottom-right .maplibregl-popup-content { transform-origin: 100% 100%; }
+.lm-popup.maplibregl-popup-anchor-left .maplibregl-popup-content { transform-origin: 0 50%; }
+.lm-popup.maplibregl-popup-anchor-right .maplibregl-popup-content { transform-origin: 100% 50%; }
+
+@keyframes lm-popup-in {
+  from {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  .lm-popup.maplibregl-popup .maplibregl-popup-content {
+    border-color: var(--border-strong);
+    box-shadow: var(--shadow-lift), 0 2px 8px rgb(0 0 0 / 0.4);
+  }
+}
+
+.lm-card {
+  width: min(264px, calc(100vw - 56px));
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+/* Compact horizontal card for short (mobile) maps: thumbnail beside the details. */
+.lm-card--compact {
+  display: flex;
+}
+.lm-card--compact .lm-card-media {
+  flex: 0 0 92px;
+  aspect-ratio: auto;
+  border-bottom: 0;
+  border-right: 1px solid var(--border);
+}
+.lm-card--compact .lm-card-body {
+  min-width: 0;
+  flex: 1;
+  padding: 10px 12px;
+}
+.lm-card--compact .lm-card-price {
+  font-size: 15px;
+}
+.lm-card--compact .lm-card-place {
+  margin-top: 3px;
+}
+.lm-card--compact .lm-card-foot {
+  margin-top: 6px;
+  padding-top: 0;
+  border-top: 0;
+}
+
+.lm-card-media {
+  display: block;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--border);
+}
+.lm-card-media img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 400ms var(--lm-ease);
+}
+@media (hover: hover) {
+  a.lm-card-media:hover img {
+    transform: scale(1.03);
+  }
+}
+
+.lm-card-body {
+  padding: 12px 14px 12px;
+}
+
+.lm-card-price-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.lm-card-price {
+  font-size: 17px;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+}
+
+.lm-card-per-sqm {
+  color: var(--faint);
+  font-size: 11.5px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.lm-card-was {
+  margin-top: 2px;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lm-card-was-delta {
+  font-weight: 600;
+}
+.lm-card-was[data-dir="down"] .lm-card-was-delta {
+  color: var(--drop);
+}
+.lm-card-was[data-dir="up"] .lm-card-was-delta {
+  color: var(--rise);
+}
+
+.lm-card-facts {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.lm-card-place {
+  margin-top: 6px;
+  overflow: hidden;
+  color: var(--fg);
+  font-size: 12.5px;
+  font-weight: 500;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  unicode-bidi: plaintext;
+}
+
+.lm-card-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+
+.lm-card-source {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.lm-card-dot {
+  width: 6px;
+  height: 6px;
+  flex: none;
+  border-radius: 999px;
+  background: var(--lm-dot, var(--p4));
+}
+
+.lm-card-link {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  height: 28px;
+  padding: 0 11px;
+  border-radius: 8px;
+  background: var(--fg);
+  color: var(--bg);
+  font-size: 12px;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+  outline: none;
+  transition:
+    transform 160ms var(--lm-ease),
+    opacity 160ms var(--lm-ease);
+}
+@media (hover: hover) {
+  .lm-card-link:hover {
+    opacity: 0.86;
+  }
+}
+.lm-card-link:active {
+  transform: scale(0.97);
+}
+.lm-card-link:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.lm-card-actions {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Favorites star: outline when off, gold when on. */
+.lm-star {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--muted);
+  cursor: pointer;
+  outline: none;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    transform 160ms var(--lm-ease),
+    background-color 160ms var(--lm-ease),
+    border-color 160ms var(--lm-ease),
+    color 160ms var(--lm-ease);
+}
+.lm-star svg {
+  width: 15px;
+  height: 15px;
+}
+.lm-star path {
+  fill: transparent;
+  stroke: currentColor;
+  transition:
+    fill 200ms var(--lm-ease),
+    stroke 200ms var(--lm-ease);
+}
+.lm-star.is-on path {
+  fill: var(--star);
+  stroke: var(--star-edge);
+}
+@media (hover: hover) {
+  .lm-star:hover {
+    border-color: var(--border-strong);
+    background: var(--surface-2);
+    color: var(--fg);
+  }
+}
+.lm-star:active {
+  transform: scale(0.94);
+}
+.lm-star:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.lm-star.is-pop svg {
+  animation: lm-star-pop 420ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+@keyframes lm-star-pop {
+  from {
+    transform: scale(0.4);
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Overlay chip                                                        */
+/* ------------------------------------------------------------------ */
+
+.lm-chip {
+  position: absolute;
+  bottom: 10px;
+  left: 10px;
+  z-index: 11;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 26px;
+  padding: 0 10px 0 9px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--lm-glass);
+  -webkit-backdrop-filter: blur(10px) saturate(1.4);
+  backdrop-filter: blur(10px) saturate(1.4);
+  box-shadow: 0 1px 2px rgb(28 27 25 / 0.06);
+  color: var(--muted);
+  font: 500 12px/1 var(--font-sans);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.lm-chip b {
+  color: var(--fg);
+  font-weight: 600;
+}
+.lm-chip-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent);
+}
+
+/* ------------------------------------------------------------------ */
+/* MapLibre controls                                                   */
+/* ------------------------------------------------------------------ */
+
+.lm-root .maplibregl-ctrl-top-left,
+.lm-root .maplibregl-ctrl-top-right,
+.lm-root .maplibregl-ctrl-bottom-left,
+.lm-root .maplibregl-ctrl-bottom-right {
+  z-index: 11;
+}
+
+.lm-root .maplibregl-ctrl-group,
+.lm-root .maplibregl-ctrl-group:not(:empty) {
+  overflow: hidden;
+  border-radius: 10px;
+  background: var(--surface);
+  box-shadow:
+    0 0 0 1px var(--border),
+    0 1px 2px rgb(28 27 25 / 0.06),
+    0 6px 16px -8px rgb(28 27 25 / 0.2);
+}
+
+.lm-root .maplibregl-ctrl-group button {
+  width: 32px;
+  height: 32px;
+  transition: background-color 150ms var(--lm-ease);
+}
+.lm-root .maplibregl-ctrl-group button + button {
+  border-top: 1px solid var(--border);
+}
+.lm-root .maplibregl-ctrl button:not(:disabled):hover,
+.lm-root .maplibregl-ctrl button:not(:disabled):active {
+  background-color: var(--surface-2);
+}
+.lm-root .maplibregl-ctrl-group button:focus:focus-visible {
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+
+.lm-root .maplibregl-ctrl-attrib.maplibregl-compact {
+  background: var(--lm-glass);
+  color: var(--muted);
+  box-shadow: 0 0 0 1px var(--border);
+  font: 11px/20px var(--font-sans);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+}
+.lm-root .maplibregl-ctrl-attrib a {
+  color: var(--muted);
+}
+.lm-root .maplibregl-ctrl-attrib-button,
+.lm-root .maplibregl-ctrl-attrib.maplibregl-compact-show .maplibregl-ctrl-attrib-button {
+  background-color: transparent;
+}
+.lm-root .maplibregl-ctrl-attrib-button:focus {
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+
+@media (prefers-color-scheme: dark) {
+  /* MapLibre's control icons are dark SVGs; flip them for the dark UI. */
+  .lm-root .maplibregl-ctrl-icon,
+  .lm-root .maplibregl-ctrl-attrib-button {
+    filter: invert(1) brightness(0.88);
+  }
+}
+
+.lm-root .maplibregl-cooperative-gesture-screen {
+  padding: 24px;
+  background: rgb(15 15 14 / 0.5);
+  font: 500 15px/1.35 var(--font-sans);
+  text-align: center;
+}
+
+/* ------------------------------------------------------------------ */
+/* Motion                                                              */
+/* ------------------------------------------------------------------ */
+
+@media (prefers-reduced-motion: reduce) {
+  .lm-pill,
+  .lm-pill-dot,
+  .lm-card-media img,
+  .lm-card-link,
+  .lm-star,
+  .lm-star path,
+  .lm-root .maplibregl-ctrl-group button {
+    transition: none;
+  }
+  .lm-popup.maplibregl-popup .maplibregl-popup-content,
+  .lm-star.is-pop svg {
+    animation: none;
+  }
+}

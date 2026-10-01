@@ -1,0 +1,54 @@
+name: Scrape listings
+
+on:
+  schedule:
+    # 00:00, 08:00, 16:00 UTC (03:00, 11:00, 19:00 Israel). Apify-backed sources run
+    # only on the 00:00 slot to stay inside the free credit.
+    - cron: "0 */8 * * *"
+  workflow_dispatch:
+    inputs:
+      only:
+        description: "Comma-separated sources (yad2,onmap,homeless,madlan,fb-group,fb-marketplace). Empty = all."
+        required: false
+      force_apify:
+        description: "Run Apify sources even outside the daily slot"
+        type: boolean
+        default: false
+
+concurrency:
+  group: scrape
+  cancel-in-progress: false
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      - run: npx playwright install --with-deps chromium
+
+      - name: Scrape, store and email
+        run: npm run scrape -- ${{ inputs.only && format('--only={0}', inputs.only) || '' }}
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
+          FB_GROUP_URLS: ${{ secrets.FB_GROUP_URLS }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASS: ${{ secrets.SMTP_PASS }}
+          NOTIFY_TO: ${{ secrets.NOTIFY_TO }}
+          DASHBOARD_URL: ${{ secrets.DASHBOARD_URL }}
+          FORCE_APIFY: ${{ inputs.force_apify && '1' || '' }}
