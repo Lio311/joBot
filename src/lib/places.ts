@@ -15,11 +15,11 @@ export interface Place {
 export const PLACES = {
   "tel-aviv": {
     name: "תל אביב",
-    lat: 32.0741,
-    lng: 34.7922,
+    lat: 32.0853,
+    lng: 34.7818,
     aliases: ["tel aviv", "tel-aviv", "telaviv", "tlv", "jaffa", "yafo", "gush dan", "תל אביב", "תל-אביב", 'ת"א', "ת״א", "יפו", "גוש דן", "המרכז", "מרכז", "central israel", "central district"],
   },
-  "ramat-gan": { name: "רמת גן", lat: 32.0838, lng: 34.8146, aliases: ["ramat gan", "ramat-gan", "רמת גן", "רמת-גן", "בורסה"] },
+  "ramat-gan": { name: "רמת גן", lat: 32.07, lng: 34.8236, aliases: ["ramat gan", "ramat-gan", "רמת גן", "רמת-גן", "בורסה"] },
   givatayim: { name: "גבעתיים", lat: 32.0716, lng: 34.8105, aliases: ["givatayim", "giv'atayim", "גבעתיים"] },
   "bnei-brak": { name: "בני ברק", lat: 32.0846, lng: 34.8338, aliases: ["bnei brak", "bnei-brak", "בני ברק"] },
   holon: { name: "חולון", lat: 32.0158, lng: 34.7874, aliases: ["holon", "חולון"] },

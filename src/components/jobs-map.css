@@ -1,0 +1,456 @@
+/* JobsMap: MapLibre chrome restyled with the app's design tokens (ported from dira-bot). */
+
+.jm-root {
+  --jm-ease: cubic-bezier(0.23, 1, 0.32, 1);
+  --jm-pill-bg: var(--surface);
+  --jm-pill-border: rgb(28 27 25 / 0.1);
+  --jm-pill-shadow: 0 1px 1px rgb(28 27 25 / 0.06), 0 2px 6px -1px rgb(28 27 25 / 0.18);
+  --jm-glass: color-mix(in srgb, var(--surface) 86%, transparent);
+
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  /* Keep marker / popup z-indexes from leaking into the page. */
+  isolation: isolate;
+  background: var(--surface-2);
+  font-family: var(--font-sans);
+}
+
+@media (prefers-color-scheme: dark) {
+  .jm-root {
+    --jm-pill-bg: var(--surface-2);
+    --jm-pill-border: rgb(255 255 255 / 0.1);
+    --jm-pill-shadow: 0 1px 2px rgb(0 0 0 / 0.5), 0 4px 10px -2px rgb(0 0 0 / 0.55);
+    --jm-glass: color-mix(in srgb, var(--surface) 82%, transparent);
+  }
+}
+
+.jm-canvas {
+  position: absolute;
+  inset: 0;
+  isolation: isolate;
+}
+
+.jm-root .jm-canvas.maplibregl-map {
+  font-family: var(--font-sans);
+}
+
+/* ------------------------------------------------------------------ */
+/* City pills                                                          */
+/* ------------------------------------------------------------------ */
+
+/* Outer element: MapLibre owns its transform; z-index is set per city (busier on top). */
+.jm-marker {
+  cursor: pointer;
+  line-height: 0;
+}
+.jm-marker:hover { z-index: 1001 !important; }
+.jm-marker.is-active { z-index: 1002 !important; }
+.jm-marker.is-selected { z-index: 1003 !important; }
+
+.jm-pill {
+  --jm-dot: var(--faint);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  height: 26px;
+  min-width: 26px;
+  padding: 0 9px 0 8px;
+  margin: 0;
+  border: 1px solid var(--jm-pill-border);
+  border-radius: 999px;
+  background: var(--jm-pill-bg);
+  color: var(--fg);
+  box-shadow: var(--jm-pill-shadow);
+  font: 600 12px/1 var(--font-sans);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  transform-origin: 50% 50%;
+  transition:
+    transform 180ms var(--jm-ease),
+    background-color 180ms var(--jm-ease),
+    border-color 180ms var(--jm-ease),
+    color 180ms var(--jm-ease),
+    box-shadow 180ms var(--jm-ease);
+}
+
+.jm-pill-dot {
+  width: 7px;
+  height: 7px;
+  flex: none;
+  border-radius: 999px;
+  background: var(--jm-dot);
+  transition: box-shadow 180ms var(--jm-ease);
+}
+
+.jm-pill-name {
+  font-weight: 500;
+}
+/* Crowded by a busier neighbour: count only, the name comes back on hover / selection. */
+.jm-marker.is-compact .jm-pill-name {
+  display: none;
+}
+.jm-marker.is-compact .jm-pill.is-active .jm-pill-name {
+  display: inline;
+}
+
+.jm-pill-count {
+  transform: translateY(0.25px);
+}
+
+@media (hover: hover) {
+  .jm-pill:hover {
+    border-color: var(--border-strong);
+  }
+  .jm-marker.is-compact .jm-pill:hover .jm-pill-name {
+    display: inline;
+  }
+}
+
+.jm-pill:active {
+  transform: scale(0.96);
+}
+
+.jm-pill:focus {
+  outline: none;
+}
+.jm-pill:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.jm-pill.is-active {
+  background: var(--fg);
+  border-color: var(--fg);
+  color: var(--bg);
+  transform: scale(1.08);
+  box-shadow: 0 2px 4px rgb(0 0 0 / 0.14), 0 8px 18px -6px rgb(0 0 0 / 0.4);
+}
+.jm-pill.is-active .jm-pill-dot {
+  box-shadow: 0 0 0 1.5px var(--bg);
+}
+.jm-pill.is-active:active {
+  transform: scale(1.02);
+}
+
+/* ------------------------------------------------------------------ */
+/* Popup                                                               */
+/* ------------------------------------------------------------------ */
+
+.jm-popup {
+  z-index: 2000;
+}
+
+.jm-popup .maplibregl-popup-tip {
+  display: none;
+}
+
+.jm-popup.maplibregl-popup .maplibregl-popup-content {
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+  color: var(--fg);
+  box-shadow: var(--shadow-lift), 0 1px 3px rgb(28 27 25 / 0.08);
+  font-family: var(--font-sans);
+  transform-origin: 50% 100%;
+  animation: jm-popup-in 200ms var(--jm-ease) both;
+}
+.jm-popup--still.maplibregl-popup .maplibregl-popup-content {
+  animation: none;
+}
+
+/* Grow out of the marker, whichever side MapLibre anchors to. */
+.jm-popup.maplibregl-popup-anchor-top .maplibregl-popup-content { transform-origin: 50% 0; }
+.jm-popup.maplibregl-popup-anchor-top-left .maplibregl-popup-content { transform-origin: 0 0; }
+.jm-popup.maplibregl-popup-anchor-top-right .maplibregl-popup-content { transform-origin: 100% 0; }
+.jm-popup.maplibregl-popup-anchor-bottom-left .maplibregl-popup-content { transform-origin: 0 100%; }
+.jm-popup.maplibregl-popup-anchor-bottom-right .maplibregl-popup-content { transform-origin: 100% 100%; }
+.jm-popup.maplibregl-popup-anchor-left .maplibregl-popup-content { transform-origin: 0 50%; }
+.jm-popup.maplibregl-popup-anchor-right .maplibregl-popup-content { transform-origin: 100% 50%; }
+
+@keyframes jm-popup-in {
+  from {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  .jm-popup.maplibregl-popup .maplibregl-popup-content {
+    border-color: var(--border-strong);
+    box-shadow: var(--shadow-lift), 0 2px 8px rgb(0 0 0 / 0.4);
+  }
+}
+
+.jm-card {
+  width: min(288px, calc(100vw - 56px));
+  font-size: 13px;
+  line-height: 1.4;
+  text-align: right;
+}
+
+.jm-card-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 12px 14px 8px;
+}
+
+.jm-card-place {
+  font-size: 16px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+.jm-card-count {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.jm-card-list {
+  margin: 0;
+  padding: 0 6px;
+  list-style: none;
+}
+
+.jm-job {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 8px;
+  border-radius: 9px;
+  color: inherit;
+  text-decoration: none;
+  outline: none;
+  transition: background-color 150ms var(--jm-ease);
+}
+@media (hover: hover) {
+  a.jm-job:hover {
+    background: var(--surface-2);
+  }
+}
+a.jm-job:focus-visible {
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+
+.jm-job-score {
+  --jm-dot: var(--faint);
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  box-shadow: inset 0 0 0 2.5px var(--jm-dot);
+  color: var(--fg);
+  font-size: 11.5px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+
+.jm-job-text {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+}
+
+.jm-job-title,
+.jm-job-company {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  text-align: right;
+}
+.jm-job-company {
+  unicode-bidi: plaintext;
+}
+.jm-job-title {
+  font-size: 13px;
+  font-weight: 600;
+}
+.jm-job-company {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.jm-card-foot {
+  margin-top: 6px;
+  padding: 9px 14px 11px;
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 12px;
+}
+
+/* ------------------------------------------------------------------ */
+/* Overlay chip                                                        */
+/* ------------------------------------------------------------------ */
+
+/* Top right: the zoom buttons hold the top left and the attribution the bottom, which on a phone-width map leaves no room. */
+.jm-chip {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 3000;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-width: calc(100% - 72px);
+  padding: 6px 10px 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 13px;
+  background: var(--jm-glass);
+  -webkit-backdrop-filter: blur(10px) saturate(1.4);
+  backdrop-filter: blur(10px) saturate(1.4);
+  box-shadow: 0 1px 2px rgb(28 27 25 / 0.06);
+  color: var(--muted);
+  font: 500 12px/1.35 var(--font-sans);
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+.jm-chip[hidden] {
+  display: none;
+}
+.jm-chip-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.jm-chip b {
+  color: var(--fg);
+  font-weight: 600;
+}
+.jm-chip-dot {
+  width: 6px;
+  height: 6px;
+  flex: none;
+  border-radius: 999px;
+  background: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent);
+}
+.jm-chip-why {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 8px;
+  padding-inline-start: 13px;
+  color: var(--faint);
+  font-size: 11.5px;
+}
+.jm-chip-all {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  pointer-events: auto;
+}
+@media (hover: hover) {
+  .jm-chip-all:hover {
+    text-decoration: underline;
+  }
+}
+.jm-chip-all:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ------------------------------------------------------------------ */
+/* MapLibre controls                                                   */
+/* ------------------------------------------------------------------ */
+
+.jm-root .maplibregl-ctrl-top-left,
+.jm-root .maplibregl-ctrl-top-right,
+.jm-root .maplibregl-ctrl-bottom-left,
+.jm-root .maplibregl-ctrl-bottom-right {
+  z-index: 3000;
+}
+
+.jm-root .maplibregl-ctrl-group,
+.jm-root .maplibregl-ctrl-group:not(:empty) {
+  overflow: hidden;
+  border-radius: 10px;
+  background: var(--surface);
+  box-shadow:
+    0 0 0 1px var(--border),
+    0 1px 2px rgb(28 27 25 / 0.06),
+    0 6px 16px -8px rgb(28 27 25 / 0.2);
+}
+
+.jm-root .maplibregl-ctrl-group button {
+  width: 32px;
+  height: 32px;
+  transition: background-color 150ms var(--jm-ease);
+}
+.jm-root .maplibregl-ctrl-group button + button {
+  border-top: 1px solid var(--border);
+}
+.jm-root .maplibregl-ctrl button:not(:disabled):hover,
+.jm-root .maplibregl-ctrl button:not(:disabled):active {
+  background-color: var(--surface-2);
+}
+.jm-root .maplibregl-ctrl-group button:focus:focus-visible {
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+
+.jm-root .maplibregl-ctrl-attrib.maplibregl-compact {
+  background: var(--jm-glass);
+  color: var(--muted);
+  box-shadow: 0 0 0 1px var(--border);
+  font: 11px/20px var(--font-sans);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+}
+.jm-root .maplibregl-ctrl-attrib a {
+  color: var(--muted);
+}
+.jm-root .maplibregl-ctrl-attrib-button,
+.jm-root .maplibregl-ctrl-attrib.maplibregl-compact-show .maplibregl-ctrl-attrib-button {
+  background-color: transparent;
+}
+.jm-root .maplibregl-ctrl-attrib-button:focus {
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+
+@media (prefers-color-scheme: dark) {
+  /* MapLibre's control icons are dark SVGs; flip them for the dark UI. */
+  .jm-root .maplibregl-ctrl-icon,
+  .jm-root .maplibregl-ctrl-attrib-button {
+    filter: invert(1) brightness(0.88);
+  }
+}
+
+.jm-root .maplibregl-cooperative-gesture-screen {
+  padding: 24px;
+  background: rgb(15 15 14 / 0.5);
+  font: 500 15px/1.35 var(--font-sans);
+  text-align: center;
+}
+
+/* ------------------------------------------------------------------ */
+/* Motion                                                              */
+/* ------------------------------------------------------------------ */
+
+@media (prefers-reduced-motion: reduce) {
+  .jm-pill,
+  .jm-pill-dot,
+  .jm-job,
+  .jm-root .maplibregl-ctrl-group button {
+    transition: none;
+  }
+  .jm-popup.maplibregl-popup .maplibregl-popup-content {
+    animation: none;
+  }
+}

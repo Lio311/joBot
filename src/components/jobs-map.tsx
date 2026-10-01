@@ -22,6 +22,9 @@ import { PLACES, type PlaceKey } from "@/lib/places";
 
 export interface JobsMapProps {
   jobs: JobView[]; // the currently filtered jobs (some have no place: remote / "Israel")
+  total: number; // jobs in the current view before the score / date / source / search filters
+  hiddenReasons: string[]; // "89 עם ציון מתחת ל-45", one per filter that hides jobs
+  onShowAll: () => void; // drop those filters
   hoveredPlace: PlaceKey | null; // card hovered in the list → highlight its city
   selectedPlace: PlaceKey | null; // city filter → open its popup + highlight
   onHover: (place: PlaceKey | null) => void;
@@ -41,9 +44,8 @@ const INITIAL_CENTER: [number, number] = [34.85, 32.08];
 const INITIAL_ZOOM = 9.4;
 const FIT_MAX_ZOOM = 12;
 const FIT_PADDING = 56;
-/** Below this zoom neighbouring cities (Tel Aviv / Ramat Gan) crowd, so markers show counts only. */
-const NAMES_ZOOM = 11;
-const POPUP_JOBS = 5;
+/** Jobs listed in a city's popup; short (phone) maps get fewer so the card fits. */
+const popupJobs = (mapHeight: number) => (mapHeight < 520 ? 3 : 5);
 
 /* ------------------------------------------------------------------ */
 /* Worker                                                              */
@@ -149,6 +151,10 @@ interface MarkerEntry {
   /** Inner pill: safe to scale/transition. */
   pill: HTMLButtonElement;
   count: HTMLSpanElement;
+  name: HTMLSpanElement;
+  /** Width the city name adds to the pill (measured once). */
+  nameWidth: number;
+  jobs: number;
   /** Signature of the fields the marker renders, to detect in-place updates. */
   sig: string;
 }
@@ -159,10 +165,33 @@ function paintMarker(entry: MarkerEntry, g: Group) {
   const name = PLACES[g.key].name;
   entry.pill.style.setProperty("--jm-dot", scoreTone(g.best).ring);
   entry.count.textContent = g.jobs.length.toLocaleString("he-IL");
+  entry.jobs = g.jobs.length;
   // Busier cities stack on top of their neighbours.
   entry.el.style.zIndex = String(10 + Math.min(g.jobs.length, 989));
   entry.pill.setAttribute("aria-label", `${name}: ${countLabel(g.jobs.length)}${g.best != null ? `, ציון גבוה ${g.best}` : ""}`);
   entry.sig = markerSig(g);
+}
+
+const PILL_H = 26;
+const GAP = 4;
+
+/**
+ * Every pill shows its city name, unless it would overlap a busier city's pill
+ * (Tel Aviv / Ramat Gan when zoomed out): then it shrinks to the count alone.
+ */
+function declutter(map: MapLibreMap, markers: Map<PlaceKey, MarkerEntry>) {
+  const placed: { x: number; y: number; w: number }[] = [];
+  const hits = (x: number, y: number, w: number) =>
+    placed.some((r) => Math.abs(r.x - x) < (r.w + w) / 2 + GAP && Math.abs(r.y - y) < PILL_H + GAP);
+  for (const e of [...markers.values()].sort((a, b) => b.jobs - a.jobs)) {
+    const { x, y } = map.project(e.marker.getLngLat());
+    // Hidden when compact, but hover / selection can show it again.
+    const bare = e.pill.offsetWidth - (e.name.offsetWidth ? e.nameWidth : 0);
+    const full = bare + e.nameWidth;
+    const fits = !hits(x, y, full);
+    e.el.classList.toggle("is-compact", !fits);
+    placed.push({ x, y, w: fits ? full : bare });
+  }
 }
 
 function setMarkerActive(entry: MarkerEntry | undefined, active: boolean, selected: boolean) {
@@ -178,7 +207,7 @@ function setMarkerActive(entry: MarkerEntry | undefined, active: boolean, select
 /* ------------------------------------------------------------------ */
 
 // Built with DOM APIs only: every string here is scraped third-party text.
-function buildPopupContent(g: Group, mapWidth: number): HTMLElement {
+function buildPopupContent(g: Group, mapWidth: number, shown: number): HTMLElement {
   const card = h("div", "jm-card");
   card.dir = "rtl";
   card.style.width = `${Math.min(288, mapWidth - 32)}px`;
@@ -188,7 +217,7 @@ function buildPopupContent(g: Group, mapWidth: number): HTMLElement {
   card.append(head);
 
   const list = h("ul", "jm-card-list");
-  for (const j of g.jobs.slice(0, POPUP_JOBS)) {
+  for (const j of g.jobs.slice(0, shown)) {
     const li = h("li");
     const href = safeHttpUrl(j.url);
     const row = href ? h("a", "jm-job") : h("div", "jm-job");
@@ -202,8 +231,9 @@ function buildPopupContent(g: Group, mapWidth: number): HTMLElement {
     score.style.setProperty("--jm-dot", tone.ring);
     score.title = tone.label;
     const text = h("span", "jm-job-text");
+    // Titles mix scripts ("Cyber Data Analyst במרכז מחקר"): lay them out RTL like the cards do.
     const title = h("span", "jm-job-title", j.title);
-    title.dir = "auto";
+    title.dir = "rtl";
     text.append(title);
     if (j.company) {
       const company = h("span", "jm-job-company", j.company);
@@ -216,7 +246,7 @@ function buildPopupContent(g: Group, mapWidth: number): HTMLElement {
   }
   card.append(list);
 
-  const rest = g.jobs.length - POPUP_JOBS;
+  const rest = g.jobs.length - shown;
   card.append(h("div", "jm-card-foot", rest > 0 ? `ועוד ${rest} ברשימה` : "הרשימה מסוננת לעיר הזו"));
   return card;
 }
@@ -239,16 +269,19 @@ function closeSilently(open: OpenPopup | null) {
 /* Component                                                           */
 /* ------------------------------------------------------------------ */
 
-function fitTo(map: MapLibreMap, bounds: LngLatBounds, animate: boolean) {
+/** `overlay`: height of the counter chip over the top of the map, kept clear of markers. */
+function fitTo(map: MapLibreMap, bounds: LngLatBounds, animate: boolean, overlay = 0) {
   const { clientWidth: w, clientHeight: hgt } = map.getContainer();
   if (!w || !hgt) return;
   // Small containers can't afford the full padding (MapLibre warns and bails).
-  const padding = Math.max(8, Math.min(FIT_PADDING, Math.floor(Math.min(w, hgt) / 5)));
+  const pad = Math.max(8, Math.min(FIT_PADDING, Math.floor(Math.min(w, hgt) / 5)));
+  const top = Math.min(Math.max(pad, overlay + 24), Math.floor(hgt / 2) - pad);
+  // Pills are wide and centred on their point; keep them clear of the zoom buttons (top-left).
+  const padding = { top, bottom: pad, right: pad + 24, left: pad + (w > 360 ? 48 : 24) };
   map.fitBounds(bounds, { padding, maxZoom: FIT_MAX_ZOOM, ...(animate ? { duration: 600 } : { animate: false }) });
 }
 
-export default function JobsMap({ jobs, hoveredPlace, selectedPlace, onHover, onSelect }: JobsMapProps) {
-  const rootRef = useRef<HTMLDivElement>(null);
+export default function JobsMap({ jobs, total, hiddenReasons, onShowAll, hoveredPlace, selectedPlace, onHover, onSelect }: JobsMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   // Created asynchronously (after the worker is prepared), hence state.
   const [map, setMap] = useState<MapLibreMap | null>(null);
@@ -261,6 +294,8 @@ export default function JobsMap({ jobs, hoveredPlace, selectedPlace, onHover, on
   // Last fitted bounds, refitted when the container resizes until the user moves the map.
   const boundsRef = useRef<LngLatBounds | null>(null);
   const userMovedRef = useRef(false);
+  const chipRef = useRef<HTMLDivElement>(null);
+  const overlay = () => chipRef.current?.offsetHeight ?? 0;
 
   // Marker/map listeners are attached once; read callbacks through refs so they never go stale.
   const onHoverRef = useRef(onHover);
@@ -315,9 +350,11 @@ export default function JobsMap({ jobs, hoveredPlace, selectedPlace, onHover, on
       m.on("click", () => {
         if (!popupRef.current) onSelectRef.current(null);
       });
-      const syncNames = () => rootRef.current?.classList.toggle("jm-names", m.getZoom() >= NAMES_ZOOM);
-      m.on("zoom", syncNames);
-      syncNames();
+      let frame = 0;
+      m.on("move", () => {
+        cancelAnimationFrame(frame);
+        frame = requestAnimationFrame(() => declutter(m, markersRef.current));
+      });
 
       instance = m;
       styleRef.current = style;
@@ -374,7 +411,8 @@ export default function JobsMap({ jobs, hoveredPlace, selectedPlace, onHover, on
       pill.type = "button";
       pill.dir = "rtl";
       const count = h("span", "jm-pill-count");
-      pill.append(h("span", "jm-pill-dot"), h("span", "jm-pill-name", p.name), count);
+      const name = h("span", "jm-pill-name", p.name);
+      pill.append(h("span", "jm-pill-dot"), name, count);
       el.append(pill);
 
       pill.addEventListener("pointerenter", (e) => {
@@ -390,10 +428,11 @@ export default function JobsMap({ jobs, hoveredPlace, selectedPlace, onHover, on
       pill.addEventListener("dblclick", (e) => e.stopPropagation());
 
       const marker = new Marker({ element: el, anchor: "center" }).setLngLat([p.lng, p.lat]).addTo(map);
-      const entry: MarkerEntry = { marker, el, pill, count, sig: "" };
+      const entry: MarkerEntry = { marker, el, pill, count, name, nameWidth: name.offsetWidth + 5, jobs: 0, sig: "" };
       paintMarker(entry, g);
       markers.set(key, entry);
     }
+    declutter(map, markers);
   }, [map, groups]);
 
   // Highlight hovered + selected markers (re-applied after the marker diff).
@@ -419,7 +458,7 @@ export default function JobsMap({ jobs, hoveredPlace, selectedPlace, onHover, on
     for (const key of groups.keys()) bounds.extend([PLACES[key].lng, PLACES[key].lat]);
     boundsRef.current = bounds;
     userMovedRef.current = false;
-    fitTo(map, bounds, hasFitRef.current);
+    fitTo(map, bounds, hasFitRef.current, overlay());
     hasFitRef.current = true;
   }, [map, placesKey, groups]);
 
@@ -436,7 +475,7 @@ export default function JobsMap({ jobs, hoveredPlace, selectedPlace, onHover, on
       cancelAnimationFrame(frame);
       frame = requestAnimationFrame(() => {
         map.resize();
-        if (!userMovedRef.current && boundsRef.current) fitTo(map, boundsRef.current, false);
+        if (!userMovedRef.current && boundsRef.current) fitTo(map, boundsRef.current, false, overlay());
       });
     });
     ro.observe(map.getContainer());
@@ -451,7 +490,8 @@ export default function JobsMap({ jobs, hoveredPlace, selectedPlace, onHover, on
   useEffect(() => {
     if (!map) return;
     const g = selectedPlace ? groups.get(selectedPlace) : undefined;
-    const sig = g ? `${g.key}:${g.jobs.slice(0, POPUP_JOBS).map((j) => j.id).join(",")}:${g.jobs.length}` : "";
+    const shown = popupJobs(map.getContainer().clientHeight);
+    const sig = g ? `${g.key}:${g.jobs.slice(0, shown).map((j) => j.id).join(",")}:${g.jobs.length}` : "";
     if (popupRef.current && popupRef.current.sig === sig) return;
 
     const reopening = popupRef.current?.key === g?.key;
@@ -470,7 +510,7 @@ export default function JobsMap({ jobs, hoveredPlace, selectedPlace, onHover, on
       padding: { top: 12, right: 12, bottom: 12, left: 12 },
     })
       .setLngLat([p.lng, p.lat])
-      .setDOMContent(buildPopupContent(g, map.getContainer().clientWidth));
+      .setDOMContent(buildPopupContent(g, map.getContainer().clientWidth, shown));
 
     const open: OpenPopup = {
       key: g.key,
@@ -484,6 +524,8 @@ export default function JobsMap({ jobs, hoveredPlace, selectedPlace, onHover, on
     popup.on("close", open.onClose);
     popup.addTo(map);
     popupRef.current = open;
+    // A picked city counts as the user taking over: a resize refit must not pan the card away.
+    userMovedRef.current = true;
 
     // Once the open animation settles, pan just enough that the whole card sits inside the map.
     const content = popup.getElement().querySelector<HTMLElement>(".maplibregl-popup-content");
@@ -506,13 +548,25 @@ export default function JobsMap({ jobs, hoveredPlace, selectedPlace, onHover, on
   }, [map, selectedPlace, groups]);
 
   return (
-    <div ref={rootRef} className="jm-root size-full">
+    <div className="jm-root size-full">
       <div ref={containerRef} className="jm-canvas" dir="ltr" />
-      <div className="jm-chip tabular">
-        <span className="jm-chip-dot" aria-hidden />
-        <span>
-          <b>{located.toLocaleString("he-IL")}</b> מתוך {jobs.length.toLocaleString("he-IL")} על המפה
-        </span>
+      <div ref={chipRef} className="jm-chip tabular" hidden={selectedPlace != null}>
+        <div className="jm-chip-row">
+          <span className="jm-chip-dot" aria-hidden />
+          <span>
+            <b>{located.toLocaleString("he-IL")}</b> על המפה
+            {jobs.length > located && ` · ${(jobs.length - located).toLocaleString("he-IL")} בלי עיר`}
+            {total > jobs.length && ` · ${(total - jobs.length).toLocaleString("he-IL")} מוסתרות בסינון`}
+          </span>
+        </div>
+        {total > jobs.length && (
+          <div className="jm-chip-why">
+            {hiddenReasons.length > 0 && <span>{hiddenReasons.join(" · ")}</span>}
+            <button type="button" onClick={onShowAll} className="jm-chip-all">
+              הצג הכל
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
