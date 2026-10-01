@@ -102,6 +102,17 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* Hebrew UI: form fields and their placeholders sit on the right, whatever is typed in them. */
+input,
+textarea,
+select {
+  text-align: right;
+}
+input::placeholder,
+textarea::placeholder {
+  text-align: right;
+}
+
 ::selection {
   background: var(--accent-soft);
 }

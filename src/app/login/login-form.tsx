@@ -17,6 +17,7 @@ export function LoginForm({ next }: { next: string }) {
           autoFocus
           required
           dir="ltr"
+          style={{ textAlign: "right" }}
           className="mt-1.5 h-11 w-full rounded-xl border border-border bg-bg px-3 text-[15px] outline-none transition-colors focus:border-accent"
         />
       </label>

@@ -27,7 +27,7 @@ function row(j: Job) {
         <div dir="auto" style="font-size:16px;font-weight:650;color:#1c1b19;line-height:1.35">${esc(j.title)}</div>
         <div dir="auto" style="font-size:13px;color:#57534e;margin-top:3px">${esc(facts)}</div>
         ${j.match?.reason ? `<div dir="rtl" style="font-size:13px;color:#1c1b19;margin-top:6px;text-align:right">${esc(j.match.reason)}</div>` : ""}
-        ${chips ? `<div dir="ltr" style="text-align:right">${chips}</div>` : ""}
+        ${chips ? `<div dir="rtl" style="text-align:right">${chips}</div>` : ""}
         <div style="font-size:11px;color:#a19c93;margin-top:6px">${esc(sourceName(j.source))}</div>
       </td>
       <td style="vertical-align:middle;width:84px;text-align:left">

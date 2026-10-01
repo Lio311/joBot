@@ -17,7 +17,7 @@ export function TagInput({
   placeholder?: string;
   suggestions?: readonly string[];
   max?: number;
-  /** Content is mostly English (titles, technologies, URLs). */
+  /** Entries are URLs: typed left-to-right, still aligned to the right edge. */
   ltr?: boolean;
   /** Returns an error message for an invalid entry. */
   validate?: (s: string) => string | null;
@@ -57,7 +57,7 @@ export function TagInput({
 
   const shownSuggestions = useMemo(() => {
     const d = draft.trim().toLowerCase();
-    return suggestions.filter((s) => !lower.includes(s.toLowerCase()) && (!d || s.toLowerCase().includes(d))).slice(0, d ? 8 : 12);
+    return suggestions.filter((s) => !lower.includes(s.toLowerCase()) && (!d || s.toLowerCase().includes(d))).slice(0, d ? 8 : 16);
   }, [suggestions, lower, draft]);
 
   return (
@@ -87,7 +87,7 @@ export function TagInput({
         <input
           id={id}
           value={draft}
-          dir={ltr ? "ltr" : "auto"}
+          dir={ltr ? "ltr" : "rtl"}
           onChange={(e) => {
             setDraft(e.target.value);
             setError(null);
@@ -95,7 +95,7 @@ export function TagInput({
           onKeyDown={onKey}
           onBlur={() => draft.trim() && add(draft)}
           placeholder={value.length ? "" : placeholder}
-          className="h-7 min-w-[8rem] flex-1 bg-transparent px-1.5 text-[14px] outline-none placeholder:text-faint"
+          className="h-7 min-w-[8rem] flex-1 bg-transparent px-1.5 text-right text-[14px] outline-none placeholder:text-right placeholder:text-faint"
         />
       </div>
       {error && <p className="mt-1.5 text-[12px] text-danger">{error}</p>}

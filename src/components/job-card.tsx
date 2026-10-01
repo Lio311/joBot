@@ -100,18 +100,18 @@ function JobCardImpl({ job, now, onStatus }: { job: JobView; now: number; onStat
                   AI
                 </span>
               )}
-              <span dir="auto">{m.reason}</span>
+              <span dir="auto" className="min-w-0 flex-1 text-right">{m.reason}</span>
             </p>
           )}
           {(m?.matched.length || m?.missing.length) ? (
-            <div className="mt-2.5 flex flex-wrap gap-1.5" dir="ltr">
+            <div className="mt-2.5 flex flex-wrap gap-1.5">
               {m.matched.slice(0, 6).map((s) => (
-                <span key={`m-${s}`} className="rounded-full bg-accent-soft px-2 py-0.5 text-[12px] font-medium text-accent">
+                <span key={`m-${s}`} dir="auto" className="rounded-full bg-accent-soft px-2 py-0.5 text-[12px] font-medium text-accent">
                   ✓ {s}
                 </span>
               ))}
               {m.missing.slice(0, 4).map((s) => (
-                <span key={`x-${s}`} className="rounded-full border border-dashed border-border-strong px-2 py-0.5 text-[12px] text-muted">
+                <span key={`x-${s}`} dir="auto" className="rounded-full border border-dashed border-border-strong px-2 py-0.5 text-[12px] text-muted">
                   {s}
                 </span>
               ))}

@@ -3,6 +3,7 @@ import { and, desc, gte, isNotNull, isNull, sql } from "drizzle-orm";
 import { getDb } from "@/db/client";
 import { companies, jobs, scrapeRuns, type JobStatus, type MatchInfo } from "@/db/schema";
 import { aiConfigured } from "./ai";
+import { draftLocally } from "./cv-draft";
 import { completeness, type ProfileAnswers } from "./profile";
 import { loadProfile } from "./profile-store";
 
@@ -104,9 +105,12 @@ export async function getProfileData() {
       .from(companies)
       .orderBy(sql`${companies.active} desc`, companies.name),
   ]);
+  const fromCv = prof.cvText ? draftLocally(prof.cvText) : null;
   return {
     answers: prof.answers,
     version: prof.version,
+    /** Titles and skills found in the CV text, offered first as one-tap suggestions. */
+    cvSuggestions: { roles: fromCv?.roles ?? [], skills: [...(fromCv?.skills ?? []), ...(fromCv?.niceSkills ?? [])] },
     cv: prof.cvText ? { fileName: prof.cvFileName, chars: prof.cvText.length, updatedAt: prof.cvUpdatedAt?.toISOString() ?? null, preview: prof.cvText.slice(0, 600) } : null,
     companies: boards.map((c) => ({ id: c.id, ats: c.ats, slug: c.slug, name: c.name, origin: c.origin, active: c.active, lastJobCount: c.lastJobCount, lastCheckedAt: c.lastCheckedAt?.toISOString() ?? null })),
     ai: aiConfigured(),

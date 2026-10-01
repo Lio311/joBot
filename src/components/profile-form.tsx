@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useRef, useState, useTransition, type ReactNode } from "react";
 import { addCompany, draftFromCv, saveAnswers, setCompanyActive, uploadCv } from "@/lib/actions";
 import type { ProfileData } from "@/lib/data";
@@ -56,9 +57,10 @@ function MultiChips<K extends string>({ options, value, onChange }: { options: r
   );
 }
 
-const inputCls = "h-11 w-full rounded-xl border border-border bg-surface px-3 text-[14px] outline-none transition-colors placeholder:text-faint focus:border-accent";
+const inputCls = "h-11 w-full text-right rounded-xl border border-border bg-surface px-3 text-[14px] outline-none transition-colors placeholder:text-faint focus:border-accent";
 
 export function ProfileForm({ data }: { data: ProfileData }) {
+  const router = useRouter();
   const [a, setA] = useState<ProfileAnswers>(data.answers);
   const [saved, setSaved] = useState(JSON.stringify(data.answers));
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
@@ -90,7 +92,9 @@ export function ProfileForm({ data }: { data: ProfileData }) {
     fd.set("cv", file);
     const res = await uploadCv(fd);
     setCvBusy(null);
+    if (fileRef.current) fileRef.current.value = "";
     setMsg(res.ok ? { ok: true, text: `קורות החיים נטענו (${res.chars.toLocaleString("he-IL")} תווים)` } : { ok: false, text: res.error });
+    if (res.ok) router.refresh(); // show the new CV card and the "fill from CV" button
   };
 
   const draft = async () => {
@@ -127,6 +131,7 @@ export function ProfileForm({ data }: { data: ProfileData }) {
       setCompanyMsg({ ok: true, text: `נוסף: ${res.name} (${res.jobs} משרות בלוח)` });
       setCompanyUrl("");
       setCompanyName("");
+      router.refresh();
     } else setCompanyMsg({ ok: false, text: res.error });
   };
 
@@ -166,11 +171,11 @@ export function ProfileForm({ data }: { data: ProfileData }) {
         </Section>
 
         <Section title="מה אני מחפש" hint="כל תפקיד הוא חיפוש נפרד בכל אתר. כתוב אותם כמו שהם מופיעים במודעות.">
-          <Field label="תפקידים" hint="עד 12">
-            <TagInput value={a.roles} onChange={(v) => set("roles", v)} placeholder="למשל Data Analyst" suggestions={ROLE_SUGGESTIONS} max={12} ltr />
+          <Field label="תפקידים" hint={data.cvSuggestions.roles.length ? "ההצעות הראשונות נמצאו בקורות החיים שלך" : "עד 12"}>
+            <TagInput value={a.roles} onChange={(v) => set("roles", v)} placeholder="למשל Data Analyst" suggestions={[...new Set([...data.cvSuggestions.roles, ...ROLE_SUGGESTIONS])]} max={12} />
           </Field>
           <Field label="מילות חיפוש נוספות" hint="טכנולוגיה או תחום שכדאי לחפש בנפרד">
-            <TagInput value={a.keywords} onChange={(v) => set("keywords", v)} placeholder="למשל Fraud, dbt" max={12} ltr />
+            <TagInput value={a.keywords} onChange={(v) => set("keywords", v)} placeholder="למשל Fraud, dbt" max={12} />
           </Field>
           <Field label="במילים שלך: מה הופך משרה למתאימה?" hint="אופציונלי">
             <textarea value={a.about} onChange={(e) => set("about", e.target.value)} rows={4} placeholder="למשל: רוצה תפקיד עם הרבה עבודה עם מוצר, צוות קטן, לא תפקידי מכירה…" className={`${inputCls} h-auto py-2.5 leading-relaxed`} />
@@ -190,10 +195,10 @@ export function ProfileForm({ data }: { data: ProfileData }) {
             <MultiChips options={SENIORITY} value={a.seniority} onChange={(v) => set("seniority", v)} />
           </Field>
           <Field label="כישורים מרכזיים" hint="הבוט מחפש אותם בכל מודעה">
-            <TagInput value={a.skills} onChange={(v) => set("skills", v)} placeholder="SQL, Python…" suggestions={SKILL_SUGGESTIONS} ltr />
+            <TagInput value={a.skills} onChange={(v) => set("skills", v)} placeholder="SQL, Python…" suggestions={[...new Set([...data.cvSuggestions.skills, ...SKILL_SUGGESTIONS])]} />
           </Field>
           <Field label="כישורים משניים" hint="יתרון">
-            <TagInput value={a.niceSkills} onChange={(v) => set("niceSkills", v)} ltr />
+            <TagInput value={a.niceSkills} onChange={(v) => set("niceSkills", v)} />
           </Field>
           <div className="grid gap-5 sm:grid-cols-2">
             <Field label="השכלה">
@@ -254,7 +259,7 @@ export function ProfileForm({ data }: { data: ProfileData }) {
           </Field>
           <Field label="הוספת לוח משרות של חברה" hint="קישור ל-Comeet / Greenhouse / Lever / Ashby">
             <div className="flex flex-col gap-2 sm:flex-row">
-              <input dir="ltr" value={companyUrl} onChange={(e) => setCompanyUrl(e.target.value)} placeholder="https://www.comeet.com/jobs/…" className={inputCls} />
+              <input dir="ltr" value={companyUrl} style={{ textAlign: "right" }} onChange={(e) => setCompanyUrl(e.target.value)} placeholder="https://www.comeet.com/jobs/…" className={inputCls} />
               <input value={companyName} onChange={(e) => setCompanyName(e.target.value)} placeholder="שם החברה" className={`${inputCls} sm:w-40`} />
               <button type="button" onClick={onAddCompany} disabled={!companyUrl.trim()} className="h-11 shrink-0 rounded-xl bg-fg px-4 text-[14px] font-semibold text-bg disabled:opacity-50">
                 הוסף
@@ -265,7 +270,7 @@ export function ProfileForm({ data }: { data: ProfileData }) {
           <div className="max-h-80 overflow-y-auto rounded-xl border border-border">
             {data.companies.map((c) => (
               <label key={c.id} className="flex items-center gap-3 border-b border-border px-3 py-2 text-[13px] last:border-0">
-                <input type="checkbox" defaultChecked={c.active} onChange={(e) => setCompanyActive(c.id, e.target.checked)} className="size-4 accent-[var(--accent)]" />
+                <input type="checkbox" defaultChecked={c.active} onChange={(e) => void setCompanyActive(c.id, e.target.checked)} className="size-4 accent-[var(--accent)]" />
                 <span className="font-medium text-fg">{c.name}</span>
                 <span className="text-faint" dir="ltr">{c.ats}</span>
                 <span className="ms-auto tabular text-muted">{c.lastJobCount != null && c.lastJobCount >= 0 ? `${c.lastJobCount} בישראל` : c.lastJobCount === -1 ? "שגיאה" : "—"}</span>
