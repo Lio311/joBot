@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { facebookGroupsFor } from "../../src/lib/config";
 import { apifySkipReason, everyNDaysSkipReason, runActor } from "../lib/apify";
 import { clean, workModelOf } from "../lib/http";
 import type { RawJob, Source } from "../types";
@@ -7,7 +8,7 @@ import type { RawJob, Source } from "../types";
 // Billed per post, and `resultsLimit` applies per group, so a few newest posts per group, every 3 days.
 
 const ACTOR = "apify/facebook-groups-scraper";
-const PER_GROUP = Number(process.env.FB_POSTS_PER_GROUP ?? 4);
+const PER_GROUP = Number(process.env.FB_POSTS_PER_GROUP ?? 3);
 const EVERY_DAYS = Number(process.env.FB_EVERY_DAYS ?? 3);
 
 interface Post {
@@ -37,8 +38,7 @@ export const facebook: Source = {
   key: "facebook",
   skip: () => apifySkipReason() ?? everyNDaysSkipReason(EVERY_DAYS),
   async run({ profile }) {
-    const groups = [...profile.facebookGroups, ...(process.env.FB_GROUP_URLS ?? "").split(",").map((s) => s.trim()).filter(Boolean)];
-    if (!groups.length) return { jobs: [], warnings: ["no Facebook groups configured (add them on the profile page)"] };
+    const groups = facebookGroupsFor(profile).map((g) => g.url);
     const posts = await runActor<Post>(ACTOR, {
       startUrls: [...new Set(groups)].map((url) => ({ url })),
       resultsLimit: PER_GROUP,

@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useRef, useState, useTransition, type ReactNode } from "react";
 import { addCompany, draftFromCv, saveAnswers, setCompanyActive, uploadCv } from "@/lib/actions";
+import { facebookGroupsFor } from "@/lib/config";
 import type { ProfileData } from "@/lib/data";
 import { relativeTime } from "@/lib/format";
 import {
@@ -74,6 +75,7 @@ export function ProfileForm({ data }: { data: ProfileData }) {
   const set = <K extends keyof ProfileAnswers>(k: K, v: ProfileAnswers[K]) => setA((x) => ({ ...x, [k]: v }));
   const dirty = JSON.stringify(a) !== saved;
   const pct = completeness(a, !!data.cv);
+  const fbGroups = facebookGroupsFor(a);
 
   const save = () =>
     start(async () => {
@@ -247,15 +249,16 @@ export function ProfileForm({ data }: { data: ProfileData }) {
         </Section>
 
         <Section title="מקורות נוספים" hint="קבוצות פייסבוק ולוחות משרות של חברות. Google X-ray מוסיף חברות חדשות לבד.">
-          <Field label="קבוצות פייסבוק ציבוריות" hint="קישור מלא לקבוצה">
-            <TagInput
-              value={a.facebookGroups}
-              onChange={(v) => set("facebookGroups", v)}
-              placeholder="https://www.facebook.com/groups/…"
-              ltr
-              max={30}
-              validate={(s) => (/^https:\/\/(www\.|m\.)?facebook\.com\/groups\/[\w.-]+\/?$/.test(s) ? null : "צריך קישור בצורה https://www.facebook.com/groups/שם-הקבוצה")}
-            />
+          <Field label="קבוצות פייסבוק" hint="נבחרות אוטומטית לפי התפקידים שלך · כל 3 ימים">
+            <ul className="flex flex-wrap gap-1.5">
+              {fbGroups.map((g) => (
+                <li key={g.url}>
+                  <a href={g.url} target="_blank" rel="noopener noreferrer" dir="auto" className="inline-flex h-7 items-center rounded-lg bg-surface-2 px-2.5 text-[12px] font-medium text-muted hover:text-fg">
+                    {g.name}
+                  </a>
+                </li>
+              ))}
+            </ul>
           </Field>
           <Field label="הוספת לוח משרות של חברה" hint="קישור ל-Comeet / Greenhouse / Lever / Ashby">
             <div className="flex flex-col gap-2 sm:flex-row">
