@@ -16,3 +16,14 @@ export function boardOf(url: string): { ats: AtsKind; slug: string } | null {
   if (u.hostname === "jobs.ashbyhq.com" && parts[0]) return { ats: "ashby", slug: parts[0] };
   return null;
 }
+
+/** Every ATS board linked from a piece of text (posting URL or description). */
+export function atsLinks(text: string): { ats: AtsKind; slug: string }[] {
+  const urls = text.match(/https?:\/\/(?:www\.)?(?:comeet\.com\/jobs|(?:job-)?boards\.greenhouse\.io|jobs\.lever\.co|jobs\.ashbyhq\.com)\/[^\s"'<>)]+/gi) ?? [];
+  const out = new Map<string, { ats: AtsKind; slug: string }>();
+  for (const u of urls) {
+    const b = boardOf(u);
+    if (b) out.set(`${b.ats}:${b.slug.toLowerCase()}`, b);
+  }
+  return [...out.values()];
+}

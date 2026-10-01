@@ -8,6 +8,7 @@ import { closeDb, getDb } from "../src/db/client";
 import { companies, jobs, scrapeRuns, type Company } from "../src/db/schema";
 import { aiConfigured, scoreWithAi } from "../src/lib/ai";
 import { searchQueries } from "../src/lib/profile";
+import { atsLinks } from "../src/lib/boards";
 import { ensureSeedCompanies, loadProfile } from "../src/lib/profile-store";
 import { ApifyBudgetError } from "./lib/apify";
 import { renderEmail, sendEmail } from "./lib/email";
@@ -71,14 +72,14 @@ async function main() {
       if (!dry) await db.insert(scrapeRuns).values({ source: source.key, status: "skipped", message: skip, finishedAt: new Date() });
       continue;
     }
-    // Boards Google just found are read in this same run.
+    // Boards discovered earlier in this run (Google, links inside postings) are read in this same run.
     if (source.key === "ats" && discovered.size && !dry) {
       const added = await db
         .insert(companies)
-        .values([...discovered.values()].map((c) => ({ ...c, origin: "google" })))
+        .values([...discovered.values()].map((c) => ({ ...c, origin: "discovered" })))
         .onConflictDoNothing()
         .returning();
-      if (added.length) log(`ats: ${added.length} new company boards from Google (${added.map((c) => c.name).join(", ")})`);
+      if (added.length) log(`ats: ${added.length} new company boards discovered (${added.map((c) => c.name).join(", ")})`);
       boards = await db.select().from(companies);
     }
 
@@ -92,6 +93,8 @@ async function main() {
         discover: (c) => discovered.set(`${c.ats}:${c.slug}`, c),
       });
       res.warnings.forEach((w) => log(`  ⚠ ${w}`));
+      // Postings often link the company's own ATS board: register it for the ats source (free discovery).
+      for (const j of res.jobs) for (const b of atsLinks(`${j.url} ${j.description ?? ""}`)) discovered.set(`${b.ats}:${b.slug}`, { ...b, name: j.company ?? b.slug.split("/")[0] });
       warnings.push(...res.warnings.filter((w) => !/read by the ats source/.test(w)).map((w) => `${source.key}: ${w}`));
 
       // List-only sources keep everything for now: the full posting decides once it's fetched.

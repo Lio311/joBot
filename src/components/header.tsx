@@ -76,8 +76,10 @@ function StatusPill({ runs, now }: { runs: RunView[]; now: number }) {
         aria-expanded={open}
         className="inline-flex h-8 items-center gap-2 whitespace-nowrap rounded-full border border-border bg-surface px-3 text-[12px] font-medium text-muted transition-colors hover:text-fg"
       >
-        <span className="size-1.5 rounded-full" style={{ background: !runs.length ? "var(--faint)" : bad ? "var(--rise)" : "var(--accent)" }} />
-        {last ? (
+        <span className="size-1.5 rounded-full" style={{ background: !scrapers.length ? "var(--faint)" : bad ? "var(--rise)" : "var(--accent)" }} />
+        {!scrapers.length ? (
+          "עוד לא נסרק"
+        ) : last ? (
           <span>
             עודכן {relativeTime(last, now)}
             <span className="hidden sm:inline">
