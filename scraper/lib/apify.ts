@@ -1,7 +1,4 @@
-import type { FeatureKey } from "../../src/db/schema";
-import type { Features } from "../types";
-import { sleep } from "./browser";
-import { parseFeatures } from "./hebrew";
+import { sleep } from "./http";
 
 // Minimal Apify REST client: start an actor run, wait for it, read its dataset.
 
@@ -76,13 +73,13 @@ export async function runActor<T>(actorId: string, input: unknown, maxWaitMs = 1
 
 /**
  * Apify sources cost money per item, so by default they run once a day (on the first
- * cron slot, 00:00 UTC) instead of every 8 hours. APIFY_EVERY_RUN=1 overrides.
+ * cron slot of the UTC day) instead of on every run. APIFY_EVERY_RUN=1 overrides.
  */
 export function apifySkipReason(): string | null {
   if (!process.env.APIFY_TOKEN) return "APIFY_TOKEN not set";
   if (process.env.APIFY_EVERY_RUN === "1" || process.env.FORCE_APIFY === "1") return null;
   const hour = new Date().getUTCHours();
-  return hour < 8 ? null : "Apify sources run once a day (00:00 UTC slot)";
+  return hour < 8 ? null : "Apify sources run once a day (first slot of the day)";
 }
 
 /** For sources that only need to run every few days on top of the daily Apify slot. */
@@ -90,58 +87,4 @@ export function everyNDaysSkipReason(days: number): string | null {
   if (process.env.APIFY_EVERY_RUN === "1" || process.env.FORCE_APIFY === "1" || days <= 1) return null;
   const day = Math.floor(Date.now() / 86_400_000);
   return day % days === 0 ? null : `runs every ${days} days to stay inside the free Apify credit`;
-}
-
-/** Field names the Yad2 / Madlan actors use for each amenity, tried in order. */
-const FEATURE_FIELDS: [FeatureKey, string[]][] = [
-  ["parking", ["hasParking", "parking", "parkingSpots", "parkingSpaces"]],
-  ["elevator", ["hasElevator", "elevator", "elevators"]],
-  ["balcony", ["hasBalcony", "balcony", "balconies"]],
-  ["safeRoom", ["hasSecureRoom", "hasSafeRoom", "hasMamad", "secureRoom", "safeRoom", "mamad"]],
-  ["airConditioning", ["hasAirConditioner", "hasAirConditioning", "airConditioner", "airConditioning"]],
-  ["storage", ["hasStorage", "hasStorageRoom", "storage", "storageRoom"]],
-  ["accessible", ["isAccessible", "hasAccessibility", "accessible", "accessibility"]],
-  ["renovated", ["isRenovated", "renovated"]],
-];
-
-/** Reads a flag that may come as a boolean, a count ("parking: 2") or a word ("yes", "אין"). */
-function flag(v: unknown): boolean | undefined {
-  if (typeof v === "boolean") return v;
-  if (typeof v === "number") return Number.isFinite(v) ? v > 0 : undefined;
-  if (typeof v !== "string") return undefined;
-  const s = v.trim().toLowerCase();
-  if (!s) return undefined;
-  if (/^(false|no|none|0|לא|אין|ללא)$/.test(s)) return false;
-  if (/^(true|yes|כן|יש)$/.test(s)) return true;
-  const n = parseFloat(s);
-  return Number.isFinite(n) ? n > 0 : undefined;
-}
-
-/**
- * Amenities from an Apify actor item. Explicit flags win over a free-text amenity list,
- * which wins over the description. Unrecognised values stay unknown.
- */
-export function apifyFeatures(item: object): Features {
-  const rec = item as Record<string, unknown>;
-  const list = ["amenities", "features", "tags"].map((k) => rec[k]).find(Array.isArray) as unknown[] | undefined;
-  const listText = list?.map((x) => (typeof x === "string" ? x : ((x as { name?: unknown })?.name ?? ""))).join(", ");
-  const out: Features = {
-    ...parseFeatures(typeof rec.description === "string" ? rec.description : null),
-    ...parseFeatures(listText),
-  };
-  for (const [key, fields] of FEATURE_FIELDS) {
-    for (const f of fields) {
-      const v = flag(rec[f]);
-      if (v !== undefined) {
-        out[key] = v;
-        break;
-      }
-    }
-  }
-  const condition = typeof rec.condition === "string" ? rec.condition : null;
-  if (condition && out.renovated === undefined) {
-    if (/משופ|renovated/i.test(condition)) out.renovated = true;
-    else if (/דרוש|needs|requires/i.test(condition)) out.renovated = false;
-  }
-  return out;
 }

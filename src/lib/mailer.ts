@@ -1,4 +1,4 @@
-// Nodemailer transport shared by the scraper (digest) and the dashboard (confirmation emails).
+// Nodemailer transport for the digest email.
 // No "server-only" here: the scraper imports this from plain Node.
 
 import nodemailer, { type Transporter } from "nodemailer";
@@ -27,30 +27,12 @@ export function getMailer({ allowLog = false, pool = false }: { allowLog?: boole
     };
     return {
       transport: pool ? nodemailer.createTransport({ ...options, pool: true, maxConnections: 1 }) : nodemailer.createTransport(options),
-      from: `diraBot <${SMTP_USER}>`,
+      from: `joBot <${SMTP_USER}>`,
       mode: "smtp",
     };
   }
   if (allowLog || process.env.MAIL_LOG === "1") {
-    return { transport: nodemailer.createTransport({ jsonTransport: true }), from: "diraBot <dev@localhost>", mode: "log" };
+    return { transport: nodemailer.createTransport({ jsonTransport: true }), from: "joBot <dev@localhost>", mode: "log" };
   }
   return null;
 }
-
-/** RFC 8058 one-click unsubscribe headers: mail clients POST to `url`. */
-export function unsubscribeHeaders(url: string) {
-  return { "List-Unsubscribe": `<${url}>`, "List-Unsubscribe-Post": "List-Unsubscribe=One-Click" };
-}
-
-/** Links that land in emails: the confirm and unsubscribe pages, and the one-click POST endpoint. */
-export function subscriptionLinks(baseUrl: string, token: string) {
-  const base = baseUrl.replace(/\/+$/, "");
-  const t = encodeURIComponent(token);
-  return {
-    confirm: `${base}/subscribe/confirm?token=${t}`,
-    unsubscribe: `${base}/unsubscribe?token=${t}`,
-    oneClick: `${base}/unsubscribe/one-click?token=${t}`,
-  };
-}
-
-export const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));

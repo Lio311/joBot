@@ -45,3 +45,7 @@ next-env.d.ts
 # local tooling
 .claude/
 dry-run.json
+
+# personal CV, never commit
+cv/*
+!cv/README.md

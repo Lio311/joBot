@@ -1,21 +1,17 @@
 import { connection } from "next/server";
-import { Dashboard } from "@/components/dashboard";
-import { FavoritesProvider } from "@/components/favorites";
-import { getDashboardData } from "@/lib/data";
+import { Header } from "@/components/header";
+import { JobsBoard } from "@/components/jobs-board";
+import { getBoardData } from "@/lib/data";
 
-export default async function Page() {
-  // Listings change every scrape; always render from the database.
-  await connection();
-  const data = await getDashboardData();
+export default async function Home() {
+  await connection(); // render on request; the build never touches the database
+  const data = await getBoardData();
   return (
-    <FavoritesProvider passcodeRequired={data.passcodeRequired}>
-      <Dashboard
-        listings={data.listings}
-        status={data.status}
-        cities={data.cities}
-        passcodeRequired={data.passcodeRequired}
-        now={data.now}
-      />
-    </FavoritesProvider>
+    <>
+      <Header runs={data.runs} now={data.now} />
+      <main className="flex-1">
+        <JobsBoard data={data} />
+      </main>
+    </>
   );
 }

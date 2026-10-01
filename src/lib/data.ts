@@ -1,61 +1,32 @@
 import "server-only";
-import { and, desc, gt, isNotNull, isNull, or, sql } from "drizzle-orm";
+import { and, desc, gte, isNotNull, isNull, sql } from "drizzle-orm";
 import { getDb } from "@/db/client";
-import { listings, scrapeRuns, type FeatureKey } from "@/db/schema";
-import { usableImage } from "@/lib/images";
-import { getCities } from "@/lib/cities";
-import { passcodeRequired } from "@/lib/passcode";
-import { summarizePrices, type PriceEntry } from "@/lib/price-history";
+import { companies, jobs, scrapeRuns, type JobStatus, type MatchInfo } from "@/db/schema";
+import { aiConfigured } from "./ai";
+import { completeness, type ProfileAnswers } from "./profile";
+import { loadProfile } from "./profile-store";
 
-export interface ListingView {
+export interface JobView {
   id: number;
   source: string;
   url: string;
-  title: string | null;
+  title: string;
+  company: string | null;
+  location: string | null;
   description: string | null;
-  city: string;
-  priority: number;
-  neighborhood: string | null;
-  street: string | null;
-  propertyType: string | null;
-  rooms: number | null;
-  sqm: number | null;
-  floor: number | null;
-  price: number | null;
-  lat: number | null;
-  lng: number | null;
-  image: string | null;
-  isAgency: boolean | null;
-  /** Amenities the source states; a missing key means unknown. */
-  features: Partial<Record<FeatureKey, boolean>>;
+  workModel: string | null;
+  employmentType: string | null;
+  score: number | null;
+  match: MatchInfo | null;
+  status: JobStatus;
   postedAt: string | null;
   firstSeenAt: string;
-  lastSeenAt: string;
-  /** The price before the latest change. */
-  previousPrice: number | null;
-  /** The last ~12 known prices, oldest first, each a change from the one before; empty when the price never changed. */
-  priceHistory: PriceEntry[];
-  /** Current price minus the first known price; null when it never changed. */
-  priceChange: number | null;
-  /** When the latest change happened; null when none, or unknown (only the site's undated "price before"). */
-  priceChangedAt: string | null;
-  /** Set when the ad was confirmed taken down ("Not relevant" on the dashboard). */
-  removedAt: string | null;
-  /** When the owner starred it (favorites); null = not starred. */
-  starredAt: string | null;
-  alsoOn: { source: string; url: string }[];
+  notified: boolean;
+  /** Other sites listing the same job. */
+  alsoOn: string[];
 }
 
-/** A tracked city as the dashboard needs it (built-in or added from the dashboard). */
-export interface CityView {
-  key: string;
-  name: string;
-  he: string;
-  priority: number;
-  custom: boolean;
-}
-
-export interface SourceStatus {
+export interface RunView {
   source: string;
   status: string;
   finishedAt: string | null;
@@ -64,94 +35,84 @@ export interface SourceStatus {
   message: string | null;
 }
 
-const ACTIVE_DAYS = 30;
-/** How long taken-down listings stay visible under "Not relevant". */
-const REMOVED_DAYS = 30;
+const DAYS = 45;
 
-export async function getDashboardData() {
+export async function getBoardData() {
   const db = getDb();
-  const since = new Date(Date.now() - ACTIVE_DAYS * 86_400_000);
-  const removedSince = new Date(Date.now() - REMOVED_DAYS * 86_400_000);
-
-  const [rows, dupes, runs, cities] = await Promise.all([
+  const since = new Date(Date.now() - DAYS * 864e5);
+  const [rows, dups, runs, prof] = await Promise.all([
     db
       .select()
-      .from(listings)
-      .where(
-        and(
-          isNull(listings.duplicateOf),
-          or(
-            and(isNull(listings.removedAt), gt(listings.lastSeenAt, since)),
-            gt(listings.removedAt, removedSince),
-            // A star never silently ages out.
-            isNotNull(listings.starredAt),
-          ),
-        ),
-      )
-      // Starred first so the row limit can't drop them.
-      .orderBy(sql`${listings.starredAt} is null`, desc(listings.firstSeenAt))
-      .limit(3000),
-    db
-      .select({ duplicateOf: listings.duplicateOf, source: listings.source, url: listings.url })
-      .from(listings)
-      .where(and(isNotNull(listings.duplicateOf), gt(listings.lastSeenAt, since))),
-    // Latest finished run per source.
+      .from(jobs)
+      .where(and(isNull(jobs.duplicateOf), gte(jobs.firstSeenAt, since)))
+      .orderBy(desc(jobs.score), desc(jobs.firstSeenAt))
+      .limit(2500),
+    db.select({ of: jobs.duplicateOf, source: jobs.source }).from(jobs).where(and(isNotNull(jobs.duplicateOf), gte(jobs.firstSeenAt, since))),
     db
       .selectDistinctOn([scrapeRuns.source])
       .from(scrapeRuns)
-      .where(sql`${scrapeRuns.status} <> 'running'`)
+      .where(isNotNull(scrapeRuns.finishedAt))
       .orderBy(scrapeRuns.source, desc(scrapeRuns.startedAt)),
-    getCities(db),
+    loadProfile(db),
   ]);
+  const alsoOn = new Map<number, Set<string>>();
+  for (const d of dups) if (d.of) alsoOn.set(d.of, (alsoOn.get(d.of) ?? new Set()).add(d.source));
 
-  const alsoOn = Map.groupBy(dupes, (d) => d.duplicateOf!);
-
-  const view: ListingView[] = rows.map((l) => {
-    const prices = summarizePrices(l.priceHistory);
-    return {
-      id: l.id,
-      source: l.source,
-      url: l.url,
-      title: l.title,
-      description: l.description ? l.description.slice(0, 400) : null,
-      city: l.city,
-      priority: l.priority,
-      neighborhood: l.neighborhood,
-      street: l.street,
-      propertyType: l.propertyType,
-      rooms: l.rooms,
-      sqm: l.sqm,
-      floor: l.floor,
-      price: l.price,
-      lat: l.lat,
-      lng: l.lng,
-      image: l.images.map((i) => usableImage(i)).find(Boolean) ?? null,
-      isAgency: l.isAgency,
-      features: l.features,
-      postedAt: l.postedAt?.toISOString() ?? null,
-      firstSeenAt: l.firstSeenAt.toISOString(),
-      lastSeenAt: l.lastSeenAt.toISOString(),
-      previousPrice: prices.previous,
-      priceHistory: prices.points,
-      priceChange: prices.change,
-      priceChangedAt: prices.changedAt,
-      removedAt: l.removedAt?.toISOString() ?? null,
-      starredAt: l.starredAt?.toISOString() ?? null,
-      alsoOn: (alsoOn.get(l.id) ?? []).map((d) => ({ source: d.source, url: d.url })),
-    };
-  });
-
-  const status: SourceStatus[] = runs.map((r) => ({
-    source: r.source,
-    status: r.status,
-    finishedAt: r.finishedAt?.toISOString() ?? null,
-    found: r.found,
-    inserted: r.inserted,
-    message: r.message,
+  const view: JobView[] = rows.map((j) => ({
+    id: j.id,
+    source: j.source,
+    url: j.url,
+    title: j.title,
+    company: j.company,
+    location: j.location,
+    description: j.description,
+    workModel: j.workModel,
+    employmentType: j.employmentType,
+    score: j.score,
+    match: j.match,
+    status: j.status,
+    postedAt: j.postedAt?.toISOString() ?? null,
+    firstSeenAt: j.firstSeenAt.toISOString(),
+    notified: !!j.notifiedAt,
+    alsoOn: [...(alsoOn.get(j.id) ?? [])].filter((s) => s !== j.source),
   }));
-
-  const cityViews: CityView[] = cities.map((c) => ({ key: c.key, name: c.name, he: c.he, priority: c.priority, custom: !!c.custom }));
-
-  // Server timestamp so relative times render identically on server and client.
-  return { listings: view, status, cities: cityViews, passcodeRequired: passcodeRequired(), now: Date.now() };
+  return {
+    jobs: view,
+    runs: runs.map<RunView>((r) => ({
+      source: r.source,
+      status: r.status,
+      finishedAt: r.finishedAt?.toISOString() ?? null,
+      found: r.found,
+      inserted: r.inserted,
+      message: r.message,
+    })),
+    profile: summarize(prof.answers, !!prof.cvText),
+    now: Date.now(),
+  };
 }
+
+function summarize(p: ProfileAnswers, hasCv: boolean) {
+  return { hasCv, roles: p.roles, minScore: p.minScore, completeness: completeness(p, hasCv), ai: aiConfigured() };
+}
+
+export async function getProfileData() {
+  const db = getDb();
+  const [prof, boards] = await Promise.all([
+    loadProfile(db),
+    db
+      .select()
+      .from(companies)
+      .orderBy(sql`${companies.active} desc`, companies.name),
+  ]);
+  return {
+    answers: prof.answers,
+    version: prof.version,
+    cv: prof.cvText ? { fileName: prof.cvFileName, chars: prof.cvText.length, updatedAt: prof.cvUpdatedAt?.toISOString() ?? null, preview: prof.cvText.slice(0, 600) } : null,
+    companies: boards.map((c) => ({ id: c.id, ats: c.ats, slug: c.slug, name: c.name, origin: c.origin, active: c.active, lastJobCount: c.lastJobCount, lastCheckedAt: c.lastCheckedAt?.toISOString() ?? null })),
+    ai: aiConfigured(),
+    now: Date.now(),
+  };
+}
+
+export type BoardData = Awaited<ReturnType<typeof getBoardData>>;
+export type ProfileData = Awaited<ReturnType<typeof getProfileData>>;

@@ -1,40 +1,21 @@
-import type { FeatureKey } from "../src/db/schema";
-import type { City, SourceKey } from "../src/lib/config";
-import type { SitePrice } from "../src/lib/price-history";
+import type { Company } from "../src/db/schema";
+import type { SourceKey } from "../src/lib/config";
+import type { ProfileAnswers } from "../src/lib/profile";
 
-/** Amenities a source states. A missing key means unknown, `false` means explicitly absent. */
-export type Features = Partial<Record<FeatureKey, boolean>>;
-
-/** What every source adapter returns before city matching and criteria filtering. */
-export interface RawListing {
+/** What every source adapter returns, before scoring and dedupe. */
+export interface RawJob {
   source: SourceKey;
   externalId: string;
   url: string;
-  cityText: string | null;
-  title?: string | null;
+  title: string;
+  company?: string | null;
+  location?: string | null;
   description?: string | null;
-  neighborhood?: string | null;
-  street?: string | null;
-  propertyType?: string | null;
-  rooms: number | null;
-  sqm?: number | null;
-  floor?: number | null;
-  price: number | null;
-  images?: string[];
-  lat?: number | null;
-  lng?: number | null;
-  isAgency?: boolean | null;
+  workModel?: "onsite" | "hybrid" | "remote" | null;
+  employmentType?: string | null;
   postedAt?: Date | null;
-  /** Free-text sources can't always state rooms; accept a missing value when the rest fits. */
-  lenientRooms?: boolean;
-  /** Overrides the address-based duplicate signature (free-text sources). */
-  fingerprint?: string | null;
-  features?: Features;
-  /**
-   * Earlier asking prices the site itself publishes (Yad2's "price before" tag, Madlan's history).
-   * `at` null = the site gives no date. Merged into the stored history by saveListings.
-   */
-  priceHistory?: SitePrice[];
+  /** The search term or board that surfaced it. */
+  query?: string | null;
 }
 
 export class BlockedError extends Error {
@@ -45,19 +26,28 @@ export class BlockedError extends Error {
 }
 
 export interface SourceResult {
-  listings: RawListing[];
-  /** Non-fatal problems, e.g. one city page failed. Shown on the dashboard status strip. */
+  jobs: RawJob[];
+  /** Non-fatal problems, e.g. one query failed. Shown on the dashboard status popover. */
   warnings: string[];
 }
 
 export interface SourceContext {
-  /** Built-in cities plus the ones added from the dashboard (see getCities). */
-  cities: City[];
+  profile: ProfileAnswers;
+  /** Search terms from the profile (roles + keywords). */
+  queries: string[];
+  companies: Company[];
+  /** Boards discovered while running (Google X-ray finds new Comeet/Greenhouse companies). */
+  discover: (c: { ats: Company["ats"]; slug: string; name: string }) => void;
 }
 
 export type Source = {
   key: SourceKey;
-  /** Returns a reason when the source can't run in this environment (missing token, disabled). */
+  /** Returns a reason when the source can't run now (missing token, not its day). */
   skip?: () => string | null;
   run: (ctx: SourceContext) => Promise<SourceResult>;
+  /**
+   * Fetches the full posting for list-only sources (title + company, no description). Called only
+   * for jobs whose title already looks promising, and capped per run (DETAILS_PER_SOURCE).
+   */
+  describe?: (job: RawJob) => Promise<Partial<RawJob>>;
 };

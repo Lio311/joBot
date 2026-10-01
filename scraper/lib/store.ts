@@ -1,150 +1,112 @@
 import { and, eq, inArray, isNull } from "drizzle-orm";
-import { CITIES, CRITERIA, inCriteria, matchCity, type City } from "../../src/lib/config";
 import type { getDb } from "../../src/db/client";
-import { listings, type Listing, type NewListing } from "../../src/db/schema";
-import { mergePriceHistory, type SitePrice } from "../../src/lib/price-history";
-import type { RawListing } from "../types";
+import { jobs, type NewJob } from "../../src/db/schema";
+import { fingerprint, scoreLocally } from "../../src/lib/match";
+import type { ProfileAnswers } from "../../src/lib/profile";
+import type { RawJob } from "../types";
 
 type Db = ReturnType<typeof getDb>;
 
-/** A row ready to save, plus the prices the site itself reports (merged into the stored history on save). */
-export type Normalized = NewListing & { sitePrices?: SitePrice[] };
+/** Jobs scoring below this against the profile aren't stored at all (company boards list every role). */
+const STORE_MIN = Number(process.env.STORE_MIN_SCORE ?? 12);
 
-/** City match + criteria filter. Returns null for listings we don't track. */
-export function normalize(r: RawListing, cities: readonly City[] = CITIES): Normalized | null {
-  const city = matchCity(r.cityText, cities);
-  if (!city) return null;
-  const rooms = r.rooms != null && Number.isFinite(r.rooms) ? r.rooms : null;
-  const price = r.price != null && Number.isFinite(r.price) ? Math.round(r.price) : null;
+export type Scored = NewJob & { excluded: boolean };
 
-  const fits = r.lenientRooms && rooms == null
-    ? price != null && price >= CRITERIA.minPrice && price <= CRITERIA.maxPrice
-    : inCriteria({ rooms, price });
-  if (!fits) return null;
+export const passes = (j: Scored) => (j.score ?? 0) >= STORE_MIN;
 
-  const street = r.street?.trim() || null;
-  const postedAt = r.postedAt && !isNaN(r.postedAt.getTime()) ? r.postedAt : null;
+/**
+ * Sources that list everything (all of a company's openings, a whole category, group posts):
+ * their jobs must match a role or keyword in the title, not just mention a skill.
+ */
+const BROAD = new Set(["ats", "gotfriends", "facebook"]);
+
+/**
+ * Cleans a raw job and scores it against the profile. Null = not worth keeping.
+ * `min` lowers the bar before a full description is fetched (list-only sources).
+ */
+export function normalize(raw: RawJob, profile: ProfileAnswers, version: number, min = STORE_MIN): Scored | null {
+  const title = raw.title.replace(/\s+/g, " ").trim().slice(0, 300);
+  if (!title || !raw.url.startsWith("http")) return null;
+  const description = raw.description?.trim().slice(0, 4000) || null;
+  const local = scoreLocally({ ...raw, title, description }, profile);
+  if (local.excluded || local.score < min) return null;
+  if (BROAD.has(raw.source) && local.titleFit < 0.5) return null;
+  const posted = raw.postedAt && !Number.isNaN(raw.postedAt.getTime()) && raw.postedAt.getTime() <= Date.now() + 864e5 ? raw.postedAt : null;
   return {
-    source: r.source,
-    externalId: r.externalId,
-    url: r.url,
-    title: r.title ?? null,
-    description: r.description ?? null,
-    city: city.key,
-    priority: city.priority,
-    neighborhood: r.neighborhood?.trim() || null,
-    street,
-    propertyType: r.propertyType ?? null,
-    rooms,
-    sqm: r.sqm ? Math.round(r.sqm) : null,
-    floor: r.floor ?? null,
-    price,
-    images: (r.images ?? []).slice(0, 8),
-    ...coords(r.lat, r.lng),
-    isAgency: r.isAgency ?? null,
-    features: r.features ?? {},
-    postedAt,
-    fingerprint: r.fingerprint ?? fingerprint(city.key, street, rooms, r.sqm ?? null),
-    // An undated site price (Yad2's "price before") dates from the ad's posting when we know it.
-    ...(r.priceHistory?.length && {
-      sitePrices: r.priceHistory.map((p) => (p.at == null && postedAt ? { ...p, at: postedAt.toISOString() } : p)),
-    }),
+    source: raw.source,
+    externalId: raw.externalId.slice(0, 300),
+    url: raw.url,
+    title,
+    company: raw.company?.trim().slice(0, 200) || null,
+    location: raw.location?.trim().slice(0, 300) || null,
+    description,
+    workModel: raw.workModel ?? null,
+    employmentType: raw.employmentType?.trim().slice(0, 100) || null,
+    query: raw.query?.slice(0, 200) ?? null,
+    postedAt: posted,
+    fingerprint: fingerprint(title, raw.company),
+    score: local.score,
+    match: local.match,
+    scoredVersion: version,
+    excluded: false,
   };
 }
 
-/** Keep coordinates only when they fall inside Israel's bounding box. */
-function coords(lat: number | null | undefined, lng: number | null | undefined) {
-  if (lat == null || lng == null || !Number.isFinite(lat) || !Number.isFinite(lng)) return {};
-  if (lat < 29 || lat > 33.5 || lng < 34 || lng > 36) return {};
-  return { lat, lng };
-}
-
 /**
- * Same flat on two sites usually shares street + house number + rooms, and size within
- * a few m². Without a house number the match is too loose, so no fingerprint.
+ * Upserts by (source, externalId). New rows that share a fingerprint with an existing original
+ * (same company + title on another site) are stored as duplicates of it.
  */
-function fingerprint(city: string, street: string | null, rooms: number | null, sqm: number | null) {
-  if (!street || !/\d/.test(street) || rooms == null) return null;
-  const s = street.replace(/["'׳״\-.,]/g, "").replace(/\s+/g, " ").trim();
-  const size = sqm ? Math.round(sqm / 5) * 5 : "x";
-  return `${city}|${s}|${rooms}|${size}`;
-}
-
-/** A price we saw change between two scrapes: `from` is the price we had stored. */
-export interface PriceChange {
-  listing: Listing;
-  from: number;
-}
-
-export async function saveListings(db: Db, batch: Normalized[]) {
-  const unique = [...new Map(batch.map((l) => [`${l.source}:${l.externalId}`, l])).values()];
-  const inserted: Listing[] = [];
-  const priceDrops: PriceChange[] = [];
-  const priceRises: PriceChange[] = [];
-  if (!unique.length) return { inserted, priceDrops, priceRises };
-
-  const now = new Date();
-  const bySource = Map.groupBy(unique, (l) => l.source);
-
-  for (const [source, items] of bySource) {
+export async function saveJobs(db: Db, batch: Scored[]): Promise<{ inserted: number[] }> {
+  const unique = [...new Map(batch.map((j) => [`${j.source}:${j.externalId}`, j])).values()];
+  const inserted: number[] = [];
+  const bySource = new Map<string, Scored[]>();
+  for (const j of unique) bySource.set(j.source, [...(bySource.get(j.source) ?? []), j]);
+  for (const [source, rows] of bySource) {
     const existing = await db
-      .select()
-      .from(listings)
-      .where(and(eq(listings.source, source), inArray(listings.externalId, items.map((i) => i.externalId))));
+      .select({ id: jobs.id, externalId: jobs.externalId, description: jobs.description, aiScored: jobs.aiScored })
+      .from(jobs)
+      .where(and(eq(jobs.source, source), inArray(jobs.externalId, rows.map((r) => r.externalId))));
     const known = new Map(existing.map((e) => [e.externalId, e]));
 
-    for (const { sitePrices, ...item } of items) {
-      const prev = known.get(item.externalId);
-      if (!prev) {
-        let duplicateOf: number | null = null;
-        if (item.fingerprint) {
-          const [twin] = await db
-            .select({ id: listings.id })
-            .from(listings)
-            .where(and(eq(listings.fingerprint, item.fingerprint), isNull(listings.duplicateOf)))
-            .limit(1);
-          duplicateOf = twin?.id ?? null;
-        }
-        const [row] = await db
-          .insert(listings)
-          .values({
-            ...item,
-            duplicateOf,
-            priceHistory: mergePriceHistory(item.price ? [{ price: item.price, at: now.toISOString() }] : [], sitePrices, now),
+    const fps = rows.map((r) => r.fingerprint).filter((f): f is string => !!f);
+    const originals = fps.length
+      ? await db
+          .select({ id: jobs.id, fingerprint: jobs.fingerprint, source: jobs.source })
+          .from(jobs)
+          .where(and(inArray(jobs.fingerprint, fps), isNull(jobs.duplicateOf)))
+      : [];
+    const originalOf = new Map(originals.filter((o) => o.source !== source).map((o) => [o.fingerprint!, o.id]));
+
+    for (const row of rows) {
+      const { excluded: _excluded, ...values } = row;
+      const prev = known.get(row.externalId);
+      if (prev) {
+        // Seen again: refresh what the site shows now, keep owner status and AI score.
+        await db
+          .update(jobs)
+          .set({
+            lastSeenAt: new Date(),
+            url: values.url,
+            title: values.title,
+            location: values.location ?? undefined,
+            // List pages carry a snippet; never overwrite a fuller description fetched earlier.
+            description: (values.description?.length ?? 0) > (prev.description?.length ?? 0) ? values.description : undefined,
+            ...(prev.aiScored ? {} : { score: values.score, match: values.match, scoredVersion: values.scoredVersion }),
           })
-          .onConflictDoNothing()
-          .returning();
-        if (row) inserted.push(row);
+          .where(eq(jobs.id, prev.id));
         continue;
       }
-
-      const priceChanged = item.price != null && item.price !== prev.price;
-      // Site-reported prices first (they describe the past), then our own reading of a change.
-      const merged = mergePriceHistory(prev.priceHistory, sitePrices, now);
-      if (priceChanged) merged.push({ price: item.price!, at: now.toISOString() });
-      const historyChanged = merged.length !== prev.priceHistory.length;
-      const [row] = await db
-        .update(listings)
-        .set({
-          lastSeenAt: now,
-          // Seen again, so not taken down after all (or re-listed).
-          removedAt: null,
-          url: item.url,
-          images: item.images?.length ? item.images : prev.images,
-          sqm: item.sqm ?? prev.sqm,
-          lat: item.lat ?? prev.lat,
-          lng: item.lng ?? prev.lng,
-          // New readings add to (or correct) what we know; keys this run didn't see stay.
-          features: { ...prev.features, ...item.features },
-          ...(priceChanged && { price: item.price }),
-          ...(historyChanged && { priceHistory: merged }),
-        })
-        .where(eq(listings.id, prev.id))
-        .returning();
-      if (priceChanged && prev.price && !row.duplicateOf) {
-        (item.price! < prev.price ? priceDrops : priceRises).push({ listing: row, from: prev.price });
+      const dupOf = row.fingerprint ? originalOf.get(row.fingerprint) : undefined;
+      const res = await db
+        .insert(jobs)
+        .values({ ...values, duplicateOf: dupOf ?? null })
+        .onConflictDoNothing()
+        .returning({ id: jobs.id });
+      if (res[0] && !dupOf) {
+        inserted.push(res[0].id);
+        if (row.fingerprint) originalOf.set(row.fingerprint, res[0].id);
       }
     }
   }
-  return { inserted, priceDrops, priceRises };
+  return { inserted };
 }

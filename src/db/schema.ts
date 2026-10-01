@@ -1,66 +1,98 @@
-import {
-  pgTable,
-  serial,
-  text,
-  integer,
-  real,
-  doublePrecision,
-  timestamp,
-  jsonb,
-  uniqueIndex,
-  index,
-  boolean,
-} from "drizzle-orm/pg-core";
-import type { PriceEntry } from "../lib/price-history";
+import type { ProfileAnswers } from "../lib/profile";
+import { pgTable, serial, text, integer, timestamp, jsonb, uniqueIndex, index, boolean } from "drizzle-orm/pg-core";
 
-export const FEATURE_KEYS = ["parking", "elevator", "balcony", "safeRoom", "airConditioning", "storage", "accessible", "renovated"] as const;
-export type FeatureKey = (typeof FEATURE_KEYS)[number];
+/** Where the owner is with a job. "new" until they act on it. */
+export const JOB_STATUSES = ["new", "saved", "applied", "interview", "rejected", "hidden"] as const;
+export type JobStatus = (typeof JOB_STATUSES)[number];
 
-export const listings = pgTable(
-  "listings",
+/** Why a job got its score: shown on the card and in the email. */
+export interface MatchInfo {
+  /** One line, in Hebrew, written by the AI (or built from the keyword match). */
+  reason: string;
+  matched: string[];
+  missing: string[];
+  /** "ai" = scored by Claude against the CV; "keywords" = local scoring only. */
+  by: "ai" | "keywords";
+  /** Seniority the posting asks for, when it says (e.g. "3+ years"). */
+  yearsRequired?: number | null;
+}
+
+export const jobs = pgTable(
+  "jobs",
   {
     id: serial("id").primaryKey(),
     source: text("source").notNull(),
     externalId: text("external_id").notNull(),
     url: text("url").notNull(),
-    title: text("title"),
+    title: text("title").notNull(),
+    company: text("company"),
+    location: text("location"),
+    /** Trimmed to 4000 characters. */
     description: text("description"),
-    city: text("city").notNull(),
-    priority: integer("priority").notNull(),
-    neighborhood: text("neighborhood"),
-    street: text("street"),
-    propertyType: text("property_type"),
-    rooms: real("rooms"),
-    sqm: integer("sqm"),
-    floor: integer("floor"),
-    price: integer("price"),
-    lat: doublePrecision("lat"),
-    lng: doublePrecision("lng"),
-    images: jsonb("images").$type<string[]>().notNull().default([]),
-    /** Loose signature (city + street + rooms + sqm) used to spot the same flat on two sites. */
+    /** onsite | hybrid | remote, when the source says. */
+    workModel: text("work_model"),
+    /** Full-time, part-time, student… as the source words it. */
+    employmentType: text("employment_type"),
+    /** Search keyword (or company board) that found it. */
+    query: text("query"),
+    postedAt: timestamp("posted_at", { withTimezone: true }),
+    /** company + title, normalized; the same job on two sites shares it. */
     fingerprint: text("fingerprint"),
     duplicateOf: integer("duplicate_of"),
-    isAgency: boolean("is_agency"),
-    postedAt: timestamp("posted_at", { withTimezone: true }),
+    /** 0–100 fit against the profile and CV. Null = not scored yet. */
+    score: integer("score"),
+    match: jsonb("match").$type<MatchInfo>(),
+    /** profile.version the score was computed against; rescored when the profile changes. */
+    scoredVersion: integer("scored_version"),
+    /** True once Claude scored it (keyword scores can be upgraded later). */
+    aiScored: boolean("ai_scored").notNull().default(false),
+    status: text("status").$type<JobStatus>().notNull().default("new"),
+    statusAt: timestamp("status_at", { withTimezone: true }),
     firstSeenAt: timestamp("first_seen_at", { withTimezone: true }).notNull().defaultNow(),
     lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).notNull().defaultNow(),
-    /** Known asking prices, oldest first: our own readings plus what the site reports (see PriceEntry). */
-    priceHistory: jsonb("price_history").$type<PriceEntry[]>().notNull().default([]),
     notifiedAt: timestamp("notified_at", { withTimezone: true }),
-    /** Amenities from the source (parking, elevator, balcony, safeRoom, …); absent key = unknown. */
-    features: jsonb("features").$type<Partial<Record<FeatureKey, boolean>>>().notNull().default({}),
-    /** Set once the listing's own page confirms the ad was taken down. */
-    removedAt: timestamp("removed_at", { withTimezone: true }),
-    /** Last time we checked a not-recently-seen listing's page for removal. */
-    checkedAt: timestamp("checked_at", { withTimezone: true }),
-    /** When the owner starred the listing from the dashboard (favorites, synced across devices). Null = not starred. */
-    starredAt: timestamp("starred_at", { withTimezone: true }),
   },
   (t) => [
-    uniqueIndex("listings_source_external_idx").on(t.source, t.externalId),
-    index("listings_fingerprint_idx").on(t.fingerprint),
-    index("listings_first_seen_idx").on(t.firstSeenAt),
+    uniqueIndex("jobs_source_external_idx").on(t.source, t.externalId),
+    index("jobs_fingerprint_idx").on(t.fingerprint),
+    index("jobs_first_seen_idx").on(t.firstSeenAt),
+    index("jobs_score_idx").on(t.score),
   ],
+);
+
+/** The owner's search profile ("איפיון"): one row, id = 1, edited from the dashboard. */
+export const profile = pgTable("profile", {
+  id: integer("id").primaryKey(),
+  /** Bumped on every save so jobs get rescored against the new answers. */
+  version: integer("version").notNull().default(1),
+  cvText: text("cv_text"),
+  cvFileName: text("cv_file_name"),
+  cvUpdatedAt: timestamp("cv_updated_at", { withTimezone: true }),
+  /** Everything from the questionnaire (see src/lib/profile.ts). */
+  answers: jsonb("answers").$type<Partial<ProfileAnswers>>().notNull().default({}),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const ATS_KINDS = ["greenhouse", "lever", "ashby", "comeet"] as const;
+export type AtsKind = (typeof ATS_KINDS)[number];
+
+/** Company career boards read directly through their ATS's public API. */
+export const companies = pgTable(
+  "companies",
+  {
+    id: serial("id").primaryKey(),
+    ats: text("ats").$type<AtsKind>().notNull(),
+    /** Board token: "riskified" (Greenhouse), "oligosecurity/5A.00B" (Comeet). */
+    slug: text("slug").notNull(),
+    name: text("name").notNull(),
+    /** seed | google | user */
+    origin: text("origin").notNull().default("user"),
+    active: boolean("active").notNull().default(true),
+    lastCheckedAt: timestamp("last_checked_at", { withTimezone: true }),
+    lastJobCount: integer("last_job_count"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("companies_ats_slug_idx").on(t.ats, t.slug)],
 );
 
 export const scrapeRuns = pgTable("scrape_runs", {
@@ -68,60 +100,14 @@ export const scrapeRuns = pgTable("scrape_runs", {
   source: text("source").notNull(),
   startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
   finishedAt: timestamp("finished_at", { withTimezone: true }),
-  status: text("status").notNull(), // ok | blocked | error | skipped
+  status: text("status").notNull(), // running | ok | blocked | paused | skipped | error
   found: integer("found").notNull().default(0),
   inserted: integer("inserted").notNull().default(0),
   message: text("message"),
 });
 
-/**
- * Cities added from the dashboard, on top of the built-in ones in src/lib/config.ts.
- * Every field is derived from the CBS settlements list when the city is added.
- */
-export const trackedCities = pgTable(
-  "tracked_cities",
-  {
-    id: serial("id").primaryKey(),
-    key: text("key").notNull(),
-    name: text("name").notNull(),
-    he: text("he").notNull(),
-    priority: integer("priority").notNull(),
-    /** CBS settlement code, which is also Yad2's city code. */
-    yad2Code: text("yad2_code").notNull(),
-    onmap: text("onmap").notNull(),
-    homeless: text("homeless").notNull(),
-    aliases: jsonb("aliases").$type<string[]>().notNull().default([]),
-    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-  },
-  (t) => [uniqueIndex("tracked_cities_key_idx").on(t.key), uniqueIndex("tracked_cities_yad2_code_idx").on(t.yad2Code)],
-);
-
-export const SUBSCRIBER_STATUSES = ["pending", "active", "unsubscribed"] as const;
-export type SubscriberStatus = (typeof SUBSCRIBER_STATUSES)[number];
-
-/** Visitors who signed up for the email digest from the dashboard (double opt-in). */
-export const subscribers = pgTable(
-  "subscribers",
-  {
-    id: serial("id").primaryKey(),
-    /** Trimmed and lowercased. */
-    email: text("email").notNull(),
-    status: text("status").$type<SubscriberStatus>().notNull().default("pending"),
-    /** Random, unguessable; used in the confirm and unsubscribe links. */
-    token: text("token").notNull(),
-    /** Only listings at this priority or better (1 = top). Null = everything. */
-    minPriority: integer("min_priority"),
-    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-    /** Last time a confirmation email went out; rate-limits resends. */
-    confirmSentAt: timestamp("confirm_sent_at", { withTimezone: true }),
-    confirmedAt: timestamp("confirmed_at", { withTimezone: true }),
-    unsubscribedAt: timestamp("unsubscribed_at", { withTimezone: true }),
-  },
-  (t) => [uniqueIndex("subscribers_email_idx").on(t.email), uniqueIndex("subscribers_token_idx").on(t.token)],
-);
-
-export type Listing = typeof listings.$inferSelect;
-export type NewListing = typeof listings.$inferInsert;
+export type Job = typeof jobs.$inferSelect;
+export type NewJob = typeof jobs.$inferInsert;
+export type Profile = typeof profile.$inferSelect;
+export type Company = typeof companies.$inferSelect;
 export type ScrapeRun = typeof scrapeRuns.$inferSelect;
-export type TrackedCity = typeof trackedCities.$inferSelect;
-export type Subscriber = typeof subscribers.$inferSelect;

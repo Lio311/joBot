@@ -86,7 +86,7 @@
   --color-danger: var(--danger);
   --color-star: var(--star);
   --color-star-edge: var(--star-edge);
-  --font-sans: var(--font-geist-sans), var(--font-heebo), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-heebo), var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, monospace;
   --ease-out-quint: cubic-bezier(0.23, 1, 0.32, 1);
 }
