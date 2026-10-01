@@ -5,6 +5,7 @@ import { companies, jobs, scrapeRuns, type JobStatus, type MatchInfo } from "@/d
 import { aiConfigured } from "./ai";
 import { draftLocally } from "./cv-draft";
 import { completeness, type ProfileAnswers } from "./profile";
+import { placeOf, type PlaceKey } from "./places";
 import { loadProfile } from "./profile-store";
 
 export interface JobView {
@@ -14,6 +15,8 @@ export interface JobView {
   title: string;
   company: string | null;
   location: string | null;
+  /** City (or region) the location resolves to, for the map. Null = remote / unknown. */
+  place: PlaceKey | null;
   description: string | null;
   workModel: string | null;
   employmentType: string | null;
@@ -66,6 +69,7 @@ export async function getBoardData() {
     title: j.title,
     company: j.company,
     location: j.location,
+    place: placeOf(j.location),
     description: j.description,
     workModel: j.workModel,
     employmentType: j.employmentType,
