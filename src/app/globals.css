@@ -112,6 +112,23 @@ input::placeholder,
 textarea::placeholder {
   text-align: right;
 }
+/* iOS zooms into any field under 16px on focus; keep fields at 16px on phones. */
+@media (max-width: 639px) {
+  input:not([type="checkbox"]):not([type="radio"]),
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
+}
+/* No grey flash on tap; buttons respond instantly (no double-tap-zoom delay). */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+button,
+a,
+label {
+  touch-action: manipulation;
+}
 
 ::selection {
   background: var(--accent-soft);

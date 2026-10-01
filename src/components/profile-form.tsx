@@ -26,7 +26,7 @@ const LANG_SUGGESTIONS = ["עברית", "English", "Русский", "العرب
 
 function Section({ title, hint, children }: { title: string; hint?: string; children: ReactNode }) {
   return (
-    <section className="rounded-2xl border border-border bg-surface p-5 shadow-[var(--shadow-card)] sm:p-6">
+    <section className="rounded-2xl border border-border bg-surface p-4 shadow-[var(--shadow-card)] sm:p-6">
       <h2 className="text-[17px] font-semibold tracking-[-0.01em]">{title}</h2>
       {hint && <p className="mt-1 text-[13px] text-muted">{hint}</p>}
       <div className="mt-5 space-y-5">{children}</div>
@@ -139,9 +139,9 @@ export function ProfileForm({ data }: { data: ProfileData }) {
 
   return (
     <div className="mx-auto w-full max-w-3xl px-4 pb-32 sm:px-6">
-      <section className="flex items-end justify-between gap-4 pt-10 pb-8">
+      <section className="flex items-end justify-between gap-4 pt-6 pb-6 sm:pt-10 sm:pb-8">
         <div>
-          <h1 className="text-[30px] font-semibold leading-tight tracking-[-0.03em] sm:text-[36px]">האיפיון שלי</h1>
+          <h1 className="text-[28px] font-semibold leading-tight tracking-[-0.03em] sm:text-[36px]">האיפיון שלי</h1>
           <p className="mt-2 max-w-xl text-[15px] text-muted">הבוט מחפש לפי התפקידים שכאן ומדרג כל משרה מול קורות החיים והתשובות. אפשר לשנות בכל זמן.</p>
         </div>
         <div className="shrink-0 text-center">
@@ -154,11 +154,11 @@ export function ProfileForm({ data }: { data: ProfileData }) {
         <Section title="קורות חיים" hint="PDF עם טקסט (לא סריקה). נשמר רק אצלך, באתר הפרטי.">
           <div className="flex flex-wrap items-center gap-3">
             <input ref={fileRef} type="file" accept="application/pdf" className="hidden" onChange={(e) => onFile(e.target.files?.[0])} />
-            <button type="button" onClick={() => fileRef.current?.click()} disabled={!!cvBusy} className="h-10 rounded-xl bg-fg px-4 text-[14px] font-semibold text-bg active:scale-[0.97] disabled:opacity-60">
+            <button type="button" onClick={() => fileRef.current?.click()} disabled={!!cvBusy} className="h-11 w-full rounded-xl bg-fg px-4 text-[14px] font-semibold text-bg active:scale-[0.97] disabled:opacity-60 sm:h-10 sm:w-auto">
               {cvBusy === "upload" ? "טוען…" : data.cv ? "החלף קורות חיים" : "העלה קורות חיים"}
             </button>
             {data.cv && (
-              <button type="button" onClick={draft} disabled={!!cvBusy} className="h-10 rounded-xl border border-border px-4 text-[14px] font-medium text-fg hover:border-accent disabled:opacity-50">
+              <button type="button" onClick={draft} disabled={!!cvBusy} className="h-11 w-full rounded-xl border border-border px-4 text-[14px] font-medium text-fg hover:border-accent disabled:opacity-50 sm:h-10 sm:w-auto">
                 {cvBusy === "draft" ? "קורא את הקורות חיים…" : "מלא אוטומטית מהקורות חיים"}
               </button>
             )}
@@ -168,7 +168,7 @@ export function ProfileForm({ data }: { data: ProfileData }) {
               <bdi>{data.cv.fileName}</bdi> · {data.cv.chars.toLocaleString("he-IL")} תווים · עודכן {relativeTime(data.cv.updatedAt, data.now)}
             </p>
           ) : (
-            <p className="text-[13px] text-muted">אפשר גם לשים את הקובץ בתיקייה cv/ בפרויקט ולהריץ npm run cv.</p>
+            <p className="hidden text-[13px] text-muted sm:block">אפשר גם לשים את הקובץ בתיקייה cv/ בפרויקט ולהריץ npm run cv.</p>
           )}
         </Section>
 
@@ -244,7 +244,9 @@ export function ProfileForm({ data }: { data: ProfileData }) {
             <TagInput value={a.excludeKeywords} onChange={(v) => set("excludeKeywords", v)} />
           </Field>
           <Field label="לשלוח במייל רק משרות עם ציון של לפחות">
-            <Segmented id="minScore" value={a.minScore} onChange={(v) => set("minScore", v)} label="ציון מינימלי למייל" options={[45, 55, 65, 75, 85].map((n) => ({ value: n, label: `${n}+` }))} />
+            <div className="sm:max-w-sm">
+              <Segmented id="minScore" full value={a.minScore} onChange={(v) => set("minScore", v)} label="ציון מינימלי למייל" options={[45, 55, 65, 75, 85].map((n) => ({ value: n, label: `${n}+` }))} />
+            </div>
           </Field>
         </Section>
 
@@ -264,15 +266,15 @@ export function ProfileForm({ data }: { data: ProfileData }) {
             <div className="flex flex-col gap-2 sm:flex-row">
               <input dir="ltr" value={companyUrl} style={{ textAlign: "right" }} onChange={(e) => setCompanyUrl(e.target.value)} placeholder="https://www.comeet.com/jobs/…" className={inputCls} />
               <input value={companyName} onChange={(e) => setCompanyName(e.target.value)} placeholder="שם החברה" className={`${inputCls} sm:w-40`} />
-              <button type="button" onClick={onAddCompany} disabled={!companyUrl.trim()} className="h-11 shrink-0 rounded-xl bg-fg px-4 text-[14px] font-semibold text-bg disabled:opacity-50">
+              <button type="button" onClick={onAddCompany} disabled={!companyUrl.trim()} className="h-11 w-full shrink-0 rounded-xl bg-fg px-4 sm:w-auto text-[14px] font-semibold text-bg disabled:opacity-50">
                 הוסף
               </button>
             </div>
             {companyMsg && <p className={`mt-2 text-[13px] ${companyMsg.ok ? "text-accent" : "text-danger"}`}>{companyMsg.text}</p>}
           </Field>
-          <div className="max-h-80 overflow-y-auto rounded-xl border border-border">
+          <div className="max-h-[60dvh] overflow-y-auto overscroll-contain rounded-xl border border-border sm:max-h-80">
             {data.companies.map((c) => (
-              <label key={c.id} className="flex items-center gap-3 border-b border-border px-3 py-2 text-[13px] last:border-0">
+              <label key={c.id} className="flex min-h-11 items-center gap-3 border-b border-border px-3 py-2 text-[13px] last:border-0 sm:min-h-0">
                 <input type="checkbox" defaultChecked={c.active} onChange={(e) => void setCompanyActive(c.id, e.target.checked)} className="size-4 accent-[var(--accent)]" />
                 <span className="font-medium text-fg">{c.name}</span>
                 <span className="text-faint" dir="ltr">{c.ats}</span>

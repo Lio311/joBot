@@ -67,7 +67,7 @@ export function TagInput({
         onClick={() => document.getElementById(id)?.focus()}
       >
         {value.map((v) => (
-          <span key={v} dir="auto" className="inline-flex h-7 max-w-full items-center gap-1 rounded-lg bg-surface-2 ps-2.5 pe-1 text-[13px] font-medium text-fg">
+          <span key={v} dir="auto" className="inline-flex h-8 max-w-full sm:h-7 items-center gap-1 rounded-lg bg-surface-2 ps-2.5 pe-1 text-[13px] font-medium text-fg">
             <span className="truncate">{v}</span>
             <button
               type="button"
@@ -76,7 +76,7 @@ export function TagInput({
                 e.stopPropagation();
                 onChange(value.filter((x) => x !== v));
               }}
-              className="flex size-5 items-center justify-center rounded-md text-muted hover:bg-border hover:text-fg"
+              className="flex size-6 items-center justify-center rounded-md text-muted hover:bg-border hover:text-fg"
             >
               <svg viewBox="0 0 12 12" className="size-2.5" fill="none" aria-hidden>
                 <path d="m3 3 6 6m0-6-6 6" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
@@ -107,7 +107,7 @@ export function TagInput({
               type="button"
               dir="auto"
               onClick={() => add(s)}
-              className="h-7 rounded-lg border border-dashed border-border-strong px-2.5 text-[12px] font-medium text-muted transition-colors hover:border-accent hover:text-accent"
+              className="h-8 rounded-lg border border-dashed border-border-strong px-2.5 text-[12px] sm:h-7 font-medium text-muted transition-colors hover:border-accent hover:text-accent"
             >
               + {s}
             </button>

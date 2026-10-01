@@ -24,11 +24,11 @@ export function Header({ runs, now }: { runs?: RunView[]; now: number }) {
   const path = usePathname();
   return (
     <header className="sticky top-0 z-40 h-14 border-b border-border bg-bg/80 backdrop-blur-xl">
-      <div className="mx-auto flex h-full max-w-6xl items-center gap-3 px-4 sm:px-6">
+      <div className="mx-auto flex h-full max-w-6xl items-center gap-2 px-4 sm:gap-3 sm:px-6">
         <Link href="/" aria-label="joBot">
           <Logo />
         </Link>
-        <nav className="ms-2 flex items-center gap-1 text-[14px] font-medium">
+        <nav className="flex items-center gap-0.5 text-[14px] font-medium sm:ms-2 sm:gap-1">
           {[
             { href: "/", label: "משרות" },
             { href: "/profile", label: "האיפיון שלי" },
@@ -81,7 +81,8 @@ function StatusPill({ runs, now }: { runs: RunView[]; now: number }) {
           "עוד לא נסרק"
         ) : last ? (
           <span>
-            עודכן {relativeTime(last, now)}
+            <span className="hidden min-[400px]:inline">עודכן </span>
+            {relativeTime(last, now)}
             <span className="hidden sm:inline">
               {" "}
               · <span className="tabular">{healthy}/{scrapers.length}</span> מקורות
