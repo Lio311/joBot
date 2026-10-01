@@ -89,7 +89,7 @@ export async function uploadCv(form: FormData): Promise<Result<{ chars: number }
 
 /** Claude reads the CV and drafts answers; the form merges them for the owner to review. */
 export async function draftFromCv(): Promise<Result<{ draft: Partial<ProfileAnswers> }>> {
-  return guarded(async () => {
+  return guarded<{ draft: Partial<ProfileAnswers> }>(async () => {
     if (!aiConfigured()) return { ok: false, error: "צריך להגדיר ANTHROPIC_API_KEY כדי למלא אוטומטית" };
     const prof = await loadProfile(getDb());
     if (!prof.cvText) return { ok: false, error: "קודם להעלות קורות חיים" };
