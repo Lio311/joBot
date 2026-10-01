@@ -36,7 +36,7 @@ export function Header({ runs, now }: { runs?: RunView[]; now: number }) {
             <Link
               key={l.href}
               href={l.href}
-              className={`rounded-lg px-2.5 py-1.5 transition-colors ${path === l.href ? "bg-surface-2 text-fg" : "text-muted hover:text-fg"}`}
+              className={`whitespace-nowrap rounded-lg px-2.5 py-1.5 transition-colors ${path === l.href ? "bg-surface-2 text-fg" : "text-muted hover:text-fg"}`}
             >
               {l.label}
             </Link>
@@ -74,7 +74,7 @@ function StatusPill({ runs, now }: { runs: RunView[]; now: number }) {
         type="button"
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
-        className="inline-flex h-8 items-center gap-2 rounded-full border border-border bg-surface px-3 text-[12px] font-medium text-muted transition-colors hover:text-fg"
+        className="inline-flex h-8 items-center gap-2 whitespace-nowrap rounded-full border border-border bg-surface px-3 text-[12px] font-medium text-muted transition-colors hover:text-fg"
       >
         <span className="size-1.5 rounded-full" style={{ background: !runs.length ? "var(--faint)" : bad ? "var(--rise)" : "var(--accent)" }} />
         {last ? (

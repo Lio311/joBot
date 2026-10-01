@@ -8,6 +8,7 @@ import { aiConfigured, draftProfileFromCv } from "./ai";
 import { AuthError, requireAuth } from "./auth";
 import { boardOf } from "./boards";
 import { pdfToText } from "./cv";
+import { draftLocally } from "./cv-draft";
 import { scoreLocally } from "./match";
 import { INDUSTRIES, normalizeAnswers, type ProfileAnswers } from "./profile";
 import { loadProfile, saveProfile } from "./profile-store";
@@ -87,13 +88,15 @@ export async function uploadCv(form: FormData): Promise<Result<{ chars: number }
   });
 }
 
-/** Claude reads the CV and drafts answers; the form merges them for the owner to review. */
+/**
+ * Drafts answers from the CV for the owner to review: titles and skills found in the text (free),
+ * or Claude's reading of it when ANTHROPIC_API_KEY is set.
+ */
 export async function draftFromCv(): Promise<Result<{ draft: Partial<ProfileAnswers> }>> {
   return guarded<{ draft: Partial<ProfileAnswers> }>(async () => {
-    if (!aiConfigured()) return { ok: false, error: "צריך להגדיר ANTHROPIC_API_KEY כדי למלא אוטומטית" };
     const prof = await loadProfile(getDb());
     if (!prof.cvText) return { ok: false, error: "קודם להעלות קורות חיים" };
-    const draft = await draftProfileFromCv(prof.cvText, INDUSTRIES);
+    const draft = aiConfigured() ? await draftProfileFromCv(prof.cvText, INDUSTRIES) : draftLocally(prof.cvText);
     return { ok: true, draft };
   });
 }

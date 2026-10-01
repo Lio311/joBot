@@ -1,17 +1,17 @@
-name: Scrape listings
+name: Scrape jobs
 
 on:
   schedule:
-    # 00:00, 08:00, 16:00 UTC (03:00, 11:00, 19:00 Israel). Apify-backed sources run
-    # only on the 00:00 slot to stay inside the free credit.
-    - cron: "0 */8 * * *"
+    # 04:00, 10:00, 16:00 UTC = 07:00, 13:00, 19:00 Israel. Apify sources (Google, Facebook)
+    # run only on the first slot of the UTC day to stay inside the free credit.
+    - cron: "0 4,10,16 * * *"
   workflow_dispatch:
     inputs:
       only:
-        description: "Comma-separated sources (yad2,onmap,homeless,madlan,fb-group,fb-marketplace). Empty = all."
+        description: "Comma-separated sources (google,linkedin,alljobs,drushim,jobmaster,gotfriends,ats,facebook). Empty = all."
         required: false
       force_apify:
-        description: "Run Apify sources even outside the daily slot"
+        description: "Run Apify sources (Google, Facebook) even outside their daily slot"
         type: boolean
         default: false
 
@@ -22,7 +22,7 @@ concurrency:
 jobs:
   scrape:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v5
 
@@ -33,20 +33,12 @@ jobs:
 
       - run: npm ci
 
-      - name: Cache Playwright browsers
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
-
-      - run: npx playwright install --with-deps chromium
-
-      - name: Scrape, store and email
+      - name: Scrape, score and email
         run: npm run scrape -- ${{ inputs.only && format('--only={0}', inputs.only) || '' }}
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
-          FB_GROUP_URLS: ${{ secrets.FB_GROUP_URLS }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           SMTP_USER: ${{ secrets.SMTP_USER }}
           SMTP_PASS: ${{ secrets.SMTP_PASS }}
           NOTIFY_TO: ${{ secrets.NOTIFY_TO }}

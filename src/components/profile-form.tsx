@@ -151,8 +151,8 @@ export function ProfileForm({ data }: { data: ProfileData }) {
               {cvBusy === "upload" ? "טוען…" : data.cv ? "החלף קורות חיים" : "העלה קורות חיים"}
             </button>
             {data.cv && (
-              <button type="button" onClick={draft} disabled={!!cvBusy || !data.ai} title={data.ai ? "" : "דורש ANTHROPIC_API_KEY"} className="h-10 rounded-xl border border-border px-4 text-[14px] font-medium text-fg hover:border-accent disabled:opacity-50">
-                {cvBusy === "draft" ? "קורא את הקורות חיים…" : "✨ מלא אוטומטית מהקורות חיים"}
+              <button type="button" onClick={draft} disabled={!!cvBusy} className="h-10 rounded-xl border border-border px-4 text-[14px] font-medium text-fg hover:border-accent disabled:opacity-50">
+                {cvBusy === "draft" ? "קורא את הקורות חיים…" : "מלא אוטומטית מהקורות חיים"}
               </button>
             )}
           </div>
@@ -172,7 +172,7 @@ export function ProfileForm({ data }: { data: ProfileData }) {
           <Field label="מילות חיפוש נוספות" hint="טכנולוגיה או תחום שכדאי לחפש בנפרד">
             <TagInput value={a.keywords} onChange={(v) => set("keywords", v)} placeholder="למשל Fraud, dbt" max={12} ltr />
           </Field>
-          <Field label="במילים שלך: מה הופך משרה למתאימה?" hint="ה-AI קורא את זה">
+          <Field label="במילים שלך: מה הופך משרה למתאימה?" hint="אופציונלי">
             <textarea value={a.about} onChange={(e) => set("about", e.target.value)} rows={4} placeholder="למשל: רוצה תפקיד עם הרבה עבודה עם מוצר, צוות קטן, לא תפקידי מכירה…" className={`${inputCls} h-auto py-2.5 leading-relaxed`} />
           </Field>
         </Section>
