@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono, Heebo } from "next/font/google";
+import { NoZoom } from "@/components/no-zoom";
 import "./globals.css";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
@@ -22,12 +23,18 @@ export const viewport: Viewport = {
     { media: "(prefers-color-scheme: dark)", color: "#0f0f0e" },
   ],
   viewportFit: "cover",
+  // App-like on phones: no pinch or double-tap zoom (desktop browser zoom is unaffected).
+  maximumScale: 1,
+  userScalable: false,
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="he" dir="rtl" className={`${geistSans.variable} ${geistMono.variable} ${heebo.variable} h-full antialiased`}>
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        <NoZoom />
+        {children}
+      </body>
     </html>
   );
 }
