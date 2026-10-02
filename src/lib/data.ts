@@ -1,5 +1,5 @@
 import "server-only";
-import { and, desc, gte, isNotNull, isNull, sql } from "drizzle-orm";
+import { and, desc, gte, isNotNull, isNull, ne, sql } from "drizzle-orm";
 import { getDb } from "@/db/client";
 import { companies, jobs, scrapeRuns, type JobStatus, type MatchInfo } from "@/db/schema";
 import { aiConfigured } from "./ai";
@@ -107,6 +107,7 @@ export async function getProfileData() {
     db
       .select()
       .from(companies)
+      .where(ne(companies.origin, "probe-miss")) // names tried by board guessing that had no board
       .orderBy(sql`${companies.active} desc`, companies.name),
   ]);
   const fromCv = prof.cvText ? draftLocally(prof.cvText) : null;

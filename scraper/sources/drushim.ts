@@ -2,12 +2,24 @@ import { BlockedError, type RawJob, type Source } from "../types";
 import { clean, get, jitter, load, relativeDate, workModelOf } from "../lib/http";
 
 // Drushim search page: server-rendered job cards (CSS-module class names, so match on the stable part).
+// Drushim sits behind Radware Bot Manager, which challenges after a few page loads in a row. So each
+// run reads only a couple of search terms, rotating through the profile's roles from run to run.
 
 const BASE = "https://www.drushim.co.il";
+const PER_RUN = Number(process.env.DRUSHIM_QUERIES_PER_RUN ?? 2);
+
+/** The terms for this run: a window over the list that moves forward every 6 hours (one cron slot). */
+function rotation(queries: string[]): string[] {
+  if (queries.length <= PER_RUN) return queries;
+  const slot = Math.floor(Date.now() / (6 * 3_600_000));
+  const start = (slot * PER_RUN) % queries.length;
+  return [...queries, ...queries].slice(start, start + PER_RUN);
+}
 
 export const drushim: Source = {
   key: "drushim",
-  async run({ queries }) {
+  async run(ctx) {
+    const queries = rotation(ctx.queries);
     const jobs: RawJob[] = [];
     const warnings: string[] = [];
     for (const q of queries) {
@@ -15,7 +27,12 @@ export const drushim: Source = {
       try {
         html = await get(`${BASE}/jobs/search/${encodeURIComponent(q)}/`, { referer: `${BASE}/` });
       } catch (e) {
-        if (e instanceof BlockedError) throw e;
+        // Stop at the first challenge (retrying deepens the block); keep what this run already read.
+        if (e instanceof BlockedError) {
+          if (!jobs.length) throw e;
+          warnings.push(`blocked after ${jobs.length} jobs`);
+          break;
+        }
         warnings.push(`"${q}": ${(e as Error).message}`);
         continue;
       }
@@ -47,7 +64,7 @@ export const drushim: Source = {
           query: q,
         });
       });
-      await jitter(2000, 4500);
+      await jitter(6000, 12000);
     }
     return { jobs, warnings };
   },

@@ -12,6 +12,7 @@ import { atsLinks } from "../src/lib/boards";
 import { ensureSeedCompanies, loadProfile } from "../src/lib/profile-store";
 import { ApifyBudgetError } from "./lib/apify";
 import { renderEmail, sendEmail } from "./lib/email";
+import { guessBoards } from "./lib/guess-boards";
 import { jitter } from "./lib/http";
 import { normalize, passes, saveJobs, type Scored } from "./lib/store";
 import { alljobs } from "./sources/alljobs";
@@ -59,6 +60,7 @@ async function main() {
 
   let boards: Company[] = await db.select().from(companies);
   const discovered = new Map<string, { ats: Company["ats"]; slug: string; name: string }>();
+  const seenCompanies: (string | null | undefined)[] = [];
 
   const sources = only ? ALL.filter((s) => only.includes(s.key)) : ALL;
   const warnings: string[] = [];
@@ -71,6 +73,15 @@ async function main() {
       log(`${source.key}: skipped (${skip})`);
       if (!dry) await db.insert(scrapeRuns).values({ source: source.key, status: "skipped", message: skip, finishedAt: new Date() });
       continue;
+    }
+    // Companies seen on job sites this run: try to find their public Greenhouse/Lever/Ashby board.
+    if (source.key === "ats" && !dry && seenCompanies.length) {
+      try {
+        await guessBoards(db, seenCompanies, log);
+      } catch (e) {
+        log(`boards: guessing failed: ${(e as Error).message}`);
+      }
+      boards = await db.select().from(companies);
     }
     // Boards discovered earlier in this run (Google, links inside postings) are read in this same run.
     if (source.key === "ats" && discovered.size && !dry) {
@@ -93,6 +104,7 @@ async function main() {
         discover: (c) => discovered.set(`${c.ats}:${c.slug}`, c),
       });
       res.warnings.forEach((w) => log(`  ⚠ ${w}`));
+      if (source.key !== "ats") seenCompanies.push(...res.jobs.map((j) => j.company));
       // Postings often link the company's own ATS board: register it for the ats source (free discovery).
       for (const j of res.jobs) for (const b of atsLinks(`${j.url} ${j.description ?? ""}`)) discovered.set(`${b.ats}:${b.slug}`, { ...b, name: j.company ?? b.slug.split("/")[0] });
       warnings.push(...res.warnings.filter((w) => !/read by the ats source/.test(w)).map((w) => `${source.key}: ${w}`));

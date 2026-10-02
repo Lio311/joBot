@@ -91,6 +91,23 @@ export const SEED_COMPANIES: { ats: "greenhouse" | "lever" | "ashby" | "comeet";
   { ats: "comeet", slug: "vastdata/43.001", name: "VAST Data" },
   { ats: "comeet", slug: "verint/F2.009", name: "Cognyte" },
   { ats: "comeet", slug: "walmart/35.000", name: "Walmart IL" },
+  { ats: "comeet", slug: "Madlan/33.00F", name: "Madlan" },
+  { ats: "comeet", slug: "arpeely/57.001", name: "Arpeely" },
+  { ats: "comeet", slug: "biocatch/03.00E", name: "BioCatch" },
+  { ats: "comeet", slug: "directeam/29.008", name: "Directeam" },
+  { ats: "comeet", slug: "kaltura/E2.00D", name: "Kaltura" },
+  { ats: "comeet", slug: "lemalabs/EA.001", name: "Lema AI" },
+  { ats: "comeet", slug: "lumenis/A1.00C", name: "Lumenis" },
+  { ats: "comeet", slug: "medison/67.00A", name: "Medison Pharma" },
+  { ats: "comeet", slug: "plus500/A1.00F", name: "Plus500" },
+  { ats: "comeet", slug: "rada/73.009", name: "DRS RADA" },
+  { ats: "comeet", slug: "rapyd/73.00e", name: "Rapyd" },
+  { ats: "comeet", slug: "skai/22.00A", name: "Skai" },
+  { ats: "comeet", slug: "vega/C9.009", name: "Vega" },
+  { ats: "comeet", slug: "webselenese/84.005", name: "Webselenese" },
+  { ats: "comeet", slug: "zim/72.008", name: "ZIM" },
+  { ats: "comeet", slug: "unleash/B9.009", name: "Unleash" },
+  { ats: "comeet", slug: "dataloop/B5.00A", name: "Dataloop AI" },
 ];
 
 /**
