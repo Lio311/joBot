@@ -2,6 +2,7 @@ import { connection } from "next/server";
 import { Header } from "@/components/header";
 import { ProfileForm } from "@/components/profile-form";
 import { getProfileData } from "@/lib/data";
+import { pushConfigured } from "@/lib/push";
 
 export default async function ProfilePage() {
   await connection();
@@ -10,7 +11,7 @@ export default async function ProfilePage() {
     <>
       <Header now={data.now} />
       <main className="flex-1">
-        <ProfileForm data={data} />
+        <ProfileForm data={data} pushPublicKey={pushConfigured() ? process.env.VAPID_PUBLIC_KEY! : null} />
       </main>
     </>
   );

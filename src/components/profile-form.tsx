@@ -19,6 +19,7 @@ import {
 } from "@/lib/profile";
 import { Chip, Segmented } from "./controls";
 import { TagInput } from "./tag-input";
+import { PushNotifications } from "./push-notifications";
 
 const ROLE_SUGGESTIONS = ["Data Analyst", "Data Scientist", "Data Engineer", "BI Developer", "Backend Developer", "Frontend Developer", "Full Stack Developer", "DevOps Engineer", "Product Manager", "Product Analyst", "QA Automation Engineer", "Software Engineer", "ML Engineer", "Security Researcher", "Customer Success Manager", "Solutions Engineer"];
 const SKILL_SUGGESTIONS = ["SQL", "Python", "Excel", "Tableau", "Power BI", "Looker", "dbt", "Airflow", "Spark", "Snowflake", "BigQuery", "AWS", "GCP", "Azure", "Docker", "Kubernetes", "Node.js", "TypeScript", "React", "Java", "Go", "C#", "Git", "Machine Learning", "Statistics", "A/B Testing"];
@@ -60,7 +61,7 @@ function MultiChips<K extends string>({ options, value, onChange }: { options: r
 
 const inputCls = "h-11 w-full text-right rounded-xl border border-border bg-surface px-3 text-[14px] outline-none transition-colors placeholder:text-faint focus:border-accent";
 
-export function ProfileForm({ data }: { data: ProfileData }) {
+export function ProfileForm({ data, pushPublicKey }: { data: ProfileData; pushPublicKey: string | null }) {
   const router = useRouter();
   const [a, setA] = useState<ProfileAnswers>(data.answers);
   const [saved, setSaved] = useState(JSON.stringify(data.answers));
@@ -151,6 +152,7 @@ export function ProfileForm({ data }: { data: ProfileData }) {
       </section>
 
       <div className="space-y-4">
+        <PushNotifications publicKey={pushPublicKey} />
         <Section title="קורות חיים" hint="PDF עם טקסט (לא סריקה). נשמר רק אצלך, באתר הפרטי.">
           <div className="flex flex-wrap items-center gap-3">
             <input ref={fileRef} type="file" accept="application/pdf" className="hidden" onChange={(e) => onFile(e.target.files?.[0])} />
@@ -243,9 +245,9 @@ export function ProfileForm({ data }: { data: ProfileData }) {
           <Field label="להסתיר משרות שהכותרת שלהן כוללת" hint="למשל Sales, משמרות">
             <TagInput value={a.excludeKeywords} onChange={(v) => set("excludeKeywords", v)} />
           </Field>
-          <Field label="לשלוח במייל רק משרות עם ציון של לפחות">
+          <Field label="לשלוח במייל ובהתראות רק משרות עם ציון של לפחות">
             <div className="sm:max-w-sm">
-              <Segmented id="minScore" full value={a.minScore} onChange={(v) => set("minScore", v)} label="ציון מינימלי למייל" options={[45, 55, 65, 75, 85].map((n) => ({ value: n, label: `${n}+` }))} />
+              <Segmented id="minScore" full value={a.minScore} onChange={(v) => set("minScore", v)} label="ציון מינימלי להתראות" options={[45, 55, 65, 75, 85].map((n) => ({ value: n, label: `${n}+` }))} />
             </div>
           </Field>
         </Section>

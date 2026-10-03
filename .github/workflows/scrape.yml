@@ -33,7 +33,7 @@ jobs:
 
       - run: npm ci
 
-      - name: Scrape, score and email
+      - name: Scrape, score and notify
         run: npm run scrape -- ${{ inputs.only && format('--only={0}', inputs.only) || '' }}
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
@@ -43,4 +43,7 @@ jobs:
           SMTP_PASS: ${{ secrets.SMTP_PASS }}
           NOTIFY_TO: ${{ secrets.NOTIFY_TO }}
           DASHBOARD_URL: ${{ secrets.DASHBOARD_URL }}
+          VAPID_PUBLIC_KEY: ${{ secrets.VAPID_PUBLIC_KEY }}
+          VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
+          VAPID_SUBJECT: ${{ secrets.VAPID_SUBJECT }}
           FORCE_APIFY: ${{ inputs.force_apify && '1' || '' }}

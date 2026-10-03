@@ -60,6 +60,22 @@ export const jobs = pgTable(
   ],
 );
 
+/** One opt-in per browser/device. Email delivery is tracked separately. */
+export const pushSubscriptions = pgTable("push_subscriptions", {
+  id: serial("id").primaryKey(),
+  endpoint: text("endpoint").notNull().unique(),
+  p256dh: text("p256dh").notNull(),
+  auth: text("auth").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const pushDeliveries = pgTable("push_deliveries", {
+  id: serial("id").primaryKey(),
+  subscriptionId: integer("subscription_id").notNull().references(() => pushSubscriptions.id, { onDelete: "cascade" }),
+  jobId: integer("job_id").notNull().references(() => jobs.id, { onDelete: "cascade" }),
+  sentAt: timestamp("sent_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [uniqueIndex("push_deliveries_subscription_job_idx").on(t.subscriptionId, t.jobId)]);
+
 /** The owner's search profile ("איפיון"): one row, id = 1, edited from the dashboard. */
 export const profile = pgTable("profile", {
   id: integer("id").primaryKey(),

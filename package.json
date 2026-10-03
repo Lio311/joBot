@@ -11,7 +11,10 @@
     "db:generate": "drizzle-kit generate",
     "db:studio": "drizzle-kit studio",
     "cv": "tsx scraper/tools/load-cv.ts",
-    "db:migrate": "tsx scraper/tools/migrate.ts"
+    "db:migrate": "tsx scraper/tools/migrate.ts",
+    "push:keys": "node scripts/push-keys.mjs",
+    "test:push": "node --import tsx --test tests/push.test.ts",
+    "prebuild": "node --import tsx scripts/prepare-deployment.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.131.0",
@@ -25,7 +28,8 @@
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "server-only": "^0.0.1",
-    "unpdf": "^1.8.1"
+    "unpdf": "^1.8.1",
+    "web-push": "^3.6.7"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
@@ -33,6 +37,7 @@
     "@types/nodemailer": "^8.0.2",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/web-push": "^3.6.4",
     "dotenv": "^18.0.5",
     "drizzle-kit": "^0.31.11",
     "eslint": "^9",

@@ -12,6 +12,7 @@ import { atsLinks } from "../src/lib/boards";
 import { ensureSeedCompanies, loadProfile } from "../src/lib/profile-store";
 import { ApifyBudgetError } from "./lib/apify";
 import { renderEmail, sendEmail } from "./lib/email";
+import { pushPass } from "./lib/push";
 import { guessBoards } from "./lib/guess-boards";
 import { jitter } from "./lib/http";
 import { normalize, passes, saveJobs, type Scored } from "./lib/store";
@@ -33,6 +34,7 @@ const flag = (name: string) => args.find((a) => a === `--${name}` || a.startsWit
 const only = flag("only")?.split("=")[1]?.split(",");
 const dry = !!flag("dry");
 const noEmail = !!flag("no-email");
+const noPush = !!flag("no-push");
 const noAi = !!flag("no-ai");
 
 const DETAILS_PER_SOURCE = Number(process.env.DETAILS_PER_SOURCE ?? 25);
@@ -145,6 +147,10 @@ async function main() {
 
   if (!noAi) await aiPass(db, profile);
   if (!noEmail) await emailPass(db, profile.answers.minScore, warnings);
+  if (!noPush) {
+    try { await pushPass(db, profile.answers.minScore, log); }
+    catch { log("push: failed to load subscriptions; retry on next run"); }
+  }
   return anySucceeded;
 }
 
