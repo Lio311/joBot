@@ -1,6 +1,7 @@
 "use client";
 
-import { startTransition, useEffect, useState } from "react";
+import { startTransition, useEffect, useId, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { devicePushStatus, subscribeDevice, testDevicePush, unsubscribeDevice } from "@/lib/push-actions";
 
 function applicationKey(key: string) {
@@ -9,12 +10,37 @@ function applicationKey(key: string) {
 }
 
 export function PushNotifications({ publicKey }: { publicKey: string | null }) {
+  const [open, setOpen] = useState(false);
+  const [left, setLeft] = useState(16);
+  const trigger = useRef<HTMLButtonElement>(null);
+  const dialog = useRef<HTMLDialogElement>(null);
+  const titleId = useId();
   const [status, setStatus] = useState<"loading" | "unsupported" | "install" | "ready" | "denied">("loading");
   const [registration, setRegistration] = useState<ServiceWorkerRegistration | null>(null);
   const [subscription, setSubscription] = useState<PushSubscription | null>(null);
   const [enabled, setEnabled] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
+
+  useEffect(() => {
+    if (!open) return;
+    const panel = dialog.current;
+    const button = trigger.current;
+    panel?.showModal();
+    const reposition = () => {
+      const width = Math.min(360, window.innerWidth - 32);
+      setLeft(Math.max(16, Math.min(button?.getBoundingClientRect().left ?? 16, window.innerWidth - width - 16)));
+    };
+    window.addEventListener("resize", reposition);
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      panel?.close();
+      window.removeEventListener("resize", reposition);
+      document.body.style.overflow = previousOverflow;
+      button?.focus();
+    };
+  }, [open]);
 
   useEffect(() => {
     let active = true;
@@ -97,8 +123,44 @@ export function PushNotifications({ publicKey }: { publicKey: string | null }) {
 
   const button = "min-h-11 rounded-xl border border-border px-4 text-[14px] font-medium disabled:opacity-50";
   return (
-    <section className="rounded-2xl border border-border bg-surface p-4 shadow-[var(--shadow-card)] sm:p-6">
-      <h2 className="text-[17px] font-semibold">התראות למכשיר</h2>
+    <>
+      <button
+        ref={trigger}
+        type="button"
+        aria-label={enabled ? "התראות · פעילות במכשיר הזה" : "התראות"}
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        title="התראות"
+        onClick={() => {
+          const bounds = trigger.current?.getBoundingClientRect();
+          const width = Math.min(360, window.innerWidth - 32);
+          setLeft(Math.max(16, Math.min((bounds?.left ?? 16), window.innerWidth - width - 16)));
+          setOpen(true);
+        }}
+        className="relative flex size-11 shrink-0 items-center justify-center rounded-full border border-border bg-surface text-muted transition-colors hover:text-fg active:scale-[0.97]"
+      >
+        <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" />
+          <path d="M10 21h4" />
+        </svg>
+        {enabled && <span className="absolute end-2 top-2 size-2 rounded-full bg-accent ring-2 ring-surface" />}
+      </button>
+      {open && createPortal(
+        <dialog
+          ref={dialog}
+          aria-labelledby={titleId}
+          onClose={() => setOpen(false)}
+          onClick={(event) => { if (event.target === event.currentTarget) dialog.current?.close(); }}
+          style={{ left, top: 64, right: "auto", bottom: "auto" }}
+          className="fixed m-0 max-h-[calc(100dvh-80px)] w-[min(360px,calc(100vw-32px))] overflow-y-auto rounded-2xl border border-border bg-surface p-0 text-fg shadow-[var(--shadow-lift)] backdrop:bg-black/25"
+        >
+        <div className="p-5" dir="rtl">
+          <div className="flex items-center justify-between gap-3">
+            <h2 id={titleId} className="text-[17px] font-semibold">התראות</h2>
+            <button type="button" aria-label="סגור התראות" onClick={() => dialog.current?.close()} className="flex size-11 shrink-0 items-center justify-center rounded-full text-muted hover:bg-surface-2 hover:text-fg">
+              <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="m6 6 12 12M18 6 6 18" /></svg>
+            </button>
+          </div>
       <p className="mt-1 text-[13px] text-muted">התראה אחרי סריקה עם משרות חדשות שעוברות את סף ההתאמה שלך, גם כשהאתר סגור. ההפעלה נפרדת לכל מכשיר.</p>
       <div className="mt-4 space-y-3">
         {status === "loading" && <p className="text-sm text-muted">בודק תמיכה בהתראות…</p>}
@@ -115,6 +177,9 @@ export function PushNotifications({ publicKey }: { publicKey: string | null }) {
         </div>
         <p role="status" aria-live="polite" className="text-sm text-muted">{message || (enabled ? "פעיל במכשיר הזה" : "")}</p>
       </div>
-    </section>
+        </div>
+        </dialog>, document.body
+      )}
+    </>
   );
 }

@@ -8,6 +8,7 @@ import type { RunView } from "@/lib/data";
 import { sourceName } from "@/lib/config";
 import { relativeTime } from "@/lib/format";
 import { Logo } from "./logo";
+import { PushNotifications } from "./push-notifications";
 
 const STATUS: Record<string, { label: string; dot: string }> = {
   ok: { label: "תקין", dot: "var(--accent)" },
@@ -20,7 +21,7 @@ const STATUS: Record<string, { label: string; dot: string }> = {
 
 const EXTRA: Record<string, string> = { ai: "ניקוד AI", profile: "פרופיל" };
 
-export function Header({ runs, now }: { runs?: RunView[]; now: number }) {
+export function Header({ runs, now, pushPublicKey }: { runs?: RunView[]; now: number; pushPublicKey: string | null }) {
   const path = usePathname();
   return (
     <header className="sticky top-0 z-40 h-14 border-b border-border bg-bg/80 backdrop-blur-xl">
@@ -38,11 +39,14 @@ export function Header({ runs, now }: { runs?: RunView[]; now: number }) {
               href={l.href}
               className={`whitespace-nowrap rounded-lg px-2.5 py-1.5 transition-colors ${path === l.href ? "bg-surface-2 text-fg" : "text-muted hover:text-fg"}`}
             >
-              {l.label}
+              {l.href === "/profile" ? <><span className="sm:hidden">האיפיון</span><span className="hidden sm:inline">{l.label}</span></> : l.label}
             </Link>
           ))}
         </nav>
-        <div className="ms-auto">{runs && <StatusPill runs={runs} now={now} />}</div>
+        <div className="ms-auto flex shrink-0 items-center gap-1.5 sm:gap-3">
+          {runs && <StatusPill runs={runs} now={now} />}
+          <PushNotifications publicKey={pushPublicKey} />
+        </div>
       </div>
     </header>
   );
@@ -74,10 +78,12 @@ function StatusPill({ runs, now }: { runs: RunView[]; now: number }) {
         type="button"
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
+        aria-label={last ? `מצב הסריקות · עודכן ${relativeTime(last, now)}` : "מצב הסריקות · עוד לא נסרק"}
+        title={last ? `עודכן ${relativeTime(last, now)}` : "עוד לא נסרק"}
         className="inline-flex h-8 items-center gap-2 whitespace-nowrap rounded-full border border-border bg-surface px-3 text-[12px] font-medium text-muted transition-colors hover:text-fg"
       >
         <span className="size-1.5 rounded-full" style={{ background: !scrapers.length ? "var(--faint)" : bad ? "var(--rise)" : "var(--accent)" }} />
-        {!scrapers.length ? (
+        <span className="hidden sm:inline">{!scrapers.length ? (
           "עוד לא נסרק"
         ) : last ? (
           <span>
@@ -90,7 +96,7 @@ function StatusPill({ runs, now }: { runs: RunView[]; now: number }) {
           </span>
         ) : (
           "עוד לא רץ"
-        )}
+        )}</span>
       </button>
       <AnimatePresence>
         {open && (

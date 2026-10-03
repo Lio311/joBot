@@ -9,9 +9,9 @@ export default async function ProfilePage() {
   const data = await getProfileData();
   return (
     <>
-      <Header now={data.now} />
+      <Header now={data.now} pushPublicKey={pushConfigured() ? process.env.VAPID_PUBLIC_KEY! : null} />
       <main className="flex-1">
-        <ProfileForm data={data} pushPublicKey={pushConfigured() ? process.env.VAPID_PUBLIC_KEY! : null} />
+        <ProfileForm data={data} />
       </main>
     </>
   );
